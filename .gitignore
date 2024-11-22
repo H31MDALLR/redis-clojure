@@ -1,15 +1,65 @@
-pom.xml
-pom.xml.asc
-*.jar
-*.class
-/lib/
-/classes/
-/target/
-/checkouts/
-.lein-deps-sum
-.lein-repl-history
-.lein-plugins/
-.lein-failures
+# ignore everything in these dirs
+
+**/classes
+**/target
+**/.artifacts
+**/.cpcache
+**/.DS_Store
+**/.gradle
+**/.clj-kondo
+
+# IDE no one but Spelljammer uses.
+# Just ignoring the whole thing since only one person uses IntelliJ
+/.idea/
+#.idea/**/workspace.xml
+#.idea/**/tasks.xml
+#.idea/**/usage.statistics.xml
+#.idea/**/shelf
+#.idea/**/statistic.xml
+#.idea/dictionaries/**
+#.idea/libraries/**
+
+#User-specific stuff
+
+.VSCodeCounter/*
+
+# File-based project format
+*.iws
+*.ipr
+
+/example/example/**
+artifacts
+projects/**/pom.xml
+
+# nrepl
 .nrepl-port
-.cpcache/
-deps/
+
+# clojure-lsp
+.lsp/sqlite*.db
+
+# Calva VS Code Extension
+.calva/*
+/**/.calva/*
+.clj-kondo/.cache/
+.clj-kondo/com.gfredericks/
+.lsp/.cache/**
+*.log
+
+# XTDB
+/data/**
+users/**
+lucene-dir/**
+datadb/**
+userdb/**
+
+# Various Node things
+/functions/create-contact/node_modules/
+/websites/engrammicai.com/node_modules/
+
+# Local Development
+**/local_config.edn
+**/infra/dockerdev/compose/volumes
+**/application_default_credentials.json
+
+
+
