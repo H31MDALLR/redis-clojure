@@ -1,8 +1,20 @@
 (ns redis.core
-  (:gen-class))
+  (:gen-class)
+  (:require
+   [clojure.java.io :as io]
+   [clojure.string :as str]
 
-(require '[clojure.java.io :as io])
-(import '[java.net ServerSocket])
+   [taoensso.timbre :as log]
+
+   [redis.commands.ping :as ping])
+  (:import
+   [java.net ServerSocket]))
+
+;; ------------------------------------------------------------------------------------------- Defs
+(def commands 
+  {:ping ping/ping})
+
+;; ------------------------------------------------------------------------------------------- Network I/O
 
 (defn receive-message
   "Read a line of textual data from the given socket"
@@ -27,9 +39,20 @@
           msg-out (handler msg-in)]
       (send-message sock msg-out)))))
 
+;; ------------------------------------------------------------------------------------------- Handler
+
 (defn handler
   [& args]
-  "TODO: Respond with output")
+
+  (let [command-key (-> args first str/lower-case keyword)
+        command (get commands command-key identity)]
+    (log/trace ::handler {:args args
+                          :command-key command-key
+                          :command command})
+    
+    (command (rest args))))
+
+;; ------------------------------------------------------------------------------------------- Main
 
 (defn -main
   "I don't do a whole lot ... yet."
@@ -39,3 +62,10 @@
   ;; Uncomment this block to pass the first stage
   (serve 6379 handler)
   )
+
+;; ------------------------------------------------------------------------------------------- REPL AREA
+
+(comment 
+  (log/set-min-level! :trace)
+  (handler "PING")
+  "leave this here.")

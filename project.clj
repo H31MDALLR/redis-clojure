@@ -5,7 +5,11 @@
             :url "https://opensource.org/licenses/MIT"}
   :dependencies [[org.clojure/clojure "1.10.3"]
                  [org.clojure/tools.cli "1.1.230"]
-                 [aleph "0.6.4"]]
+
+                 [aleph "0.6.4"]
+                 
+                 ;; logging
+                 [com.taoensso/timbre "6.0.2"]]
 
   :main ^:skip-aot redis.core
   :target-path "/tmp/codecrafters-redis-target/%s"
