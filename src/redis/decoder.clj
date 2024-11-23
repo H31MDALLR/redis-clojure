@@ -10,6 +10,11 @@
   {:command (keywordize command)
    :args args})
 
+(defmethod decode "ECHO"
+  [[command message]]
+  {:command (keywordize command)
+   :message message})
+
 (defmethod decode "ERROR"
   [[command exception]]
   {:command (keywordize command)

@@ -11,6 +11,7 @@
    
    [redis.commands.dispatch :as dispatch]
    [redis.commands.command]
+   [redis.commands.echo]
    [redis.commands.error]
    [redis.commands.ping]
    [redis.commands.set]
