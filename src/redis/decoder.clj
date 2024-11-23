@@ -5,6 +5,11 @@
 (defn keywordize [s] (-> s str/lower-case keyword))
 
 (defmulti decode (fn [coll] (first coll)))
+(defmethod decode "COMMAND"
+  [[command & args]]
+  {:command (keywordize command)
+   :args args})
+
 (defmethod decode "ERROR"
   [[command exception]]
   {:command (keywordize command)

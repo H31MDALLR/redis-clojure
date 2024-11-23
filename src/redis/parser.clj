@@ -76,6 +76,7 @@
   
   (do
     ;; Example RESP inputs
+    (def docs-command "*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n")
     (def simple-string "+OK\r\n")
     (def error "-ERR unknown command\r\n")
     (def integer ":1000\r\n")
@@ -86,6 +87,8 @@
     (def ping-command "*1\r\n$4\r\nPING\r\n"))
 
 ;; Parse them
+  (parse-resp docs-command)
+
   (parse-resp simple-string)
 ;; => [:SimpleString "OK"]
   

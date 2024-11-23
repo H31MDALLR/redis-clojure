@@ -1,80 +1,103 @@
 (ns redis.core
   (:gen-class)
   (:require
-   [clojure.java.io :as io]
-
+   
+   [aleph.tcp :as tcp]
+   [gloss.core :as gloss]
+   [gloss.io :as io]
+   [manifold.deferred :as d]
+   [manifold.stream :as s]
    [taoensso.timbre :as log]
-
-   [redis.commands.command :as command]
+   
+   [redis.commands.dispatch :as dispatch]
+   [redis.commands.command]
    [redis.commands.error]
    [redis.commands.ping]
    [redis.commands.set]
    [redis.decoder :as decoder]
-   [redis.parser :as parser])
-  (:import
-   [java.net ServerSocket]))
+   [redis.parser :as parser]
+   [redis.encoder :as encoder]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
 
-(defn read-with-crlf [input-stream]
-  (loop [buffer (byte-array 1024)
-         output []]
-    (let [read-count (.read input-stream buffer)]
-      (if (neg? read-count)
-        output
-        (recur buffer (conj output (String. buffer 0 read-count)))))))
+(defn handler
+  [msg]
+  (log/info ::handler {:args msg})
 
-(defn read-lines [reader]
-  (loop [output ""]
-    (let [ready? (.ready reader)]
-      (if ready? 
-        (recur (str output  (.readLine reader) "\r\n"))
-        (do 
-          (log/info ::read-lines {:output output})
-          output)))))
-
-;; ------------------------------------------------------------------------------------------- Network I/O
-
-(defn receive-message
-  "Read a line of textual data from the given socket"
-  [socket]
-  (let [r   (io/reader (.getInputStream socket))
-        msg (read-lines r)]
-    (log/info ::recieve-message {:msg r})
-    msg))
-
-(defn send-message
-  "Send the given string message out over the given socket"
-  [socket msg]
-  (log/info ::send-message {:msg msg})
-  (let [writer (io/writer (.getOutputStream socket))]
-    (.write writer (str msg))
-    (.flush writer)))
-
-(defn serve [port handler]
-  (with-open [server-sock (ServerSocket. port)]
-    ;; Since the tester restarts your program quite often, setting SO_REUSEADDR
-    ;; ensures that we don't run into 'Address already in use' errors
-    (. server-sock (setReuseAddress true))
-
-   (with-open [sock (.accept server-sock)]
-    (let [msg-in (receive-message sock)
-          _  (log/info ::serve {:msg msg-in})
-
-          msg-out (handler msg-in)]
-      (send-message sock msg-out)))))
+  (->> msg
+       parser/parse-resp
+       decoder/decode
+       dispatch/command-dispatch))
 
 ;; ------------------------------------------------------------------------------------------- Handler
 
-(defn handler
-  [& args]
-  (log/info ::handler {:args args})
+(def protocol
+  (gloss/compile-frame
+   (gloss/finite-frame :uint32
+                       (gloss/string :utf-8))))
 
-  (->> args
-       first
-       parser/parse-resp
-       decoder/decode
-       command/command))
+
+(defn wrap-duplex-stream
+  [protocol s]
+  (let [out (s/stream)]
+    (s/connect
+     (s/map #(io/encode protocol %) out)
+     s)
+    (s/splice
+     out
+     (io/decode-stream s protocol))))
+;; ------------------------------------------------------------------------------------------- Network I/O
+
+(defn chain-test
+  [f]
+  (fn [s info]
+    
+    (log/info "New connection from:" info)
+  ;; `socket` is a duplex stream, you can read and write to it
+    (d/loop []
+      (-> (s/take! s ::none)
+          (d/chain  (fn [msg]
+                      (if (= ::none msg)
+                        ::none
+                        (d/future (f msg))))
+                    (fn [msg]
+                      (s/put! s msg))
+                    (fn [result]
+                      (when result
+                        (d/recur))))
+          (d/catch
+           (fn [ex]
+             (s/put! s (encoder/encode-error ex))
+             (s/close! s)))))))
+
+(defn handle-message [message socket]
+  (try
+    (let [response (handler message)]
+      (log/info "Sending response:" response)
+      (s/put! socket response))
+    (catch Exception e
+      (log/error e "Error handling message"))))
+
+(defn handle-connection [socket info]
+  (log/info "New connection from:" info)
+  (s/consume
+   (fn [raw-message]
+     (try
+       (let [message (String. raw-message "UTF-8")] ;; Decode incoming bytes
+         (log/info "Received message:" message)
+         (handle-message message socket))
+       (catch Exception e
+         (log/error e "Error decoding message" e)
+         (s/close! socket)))) ;; Close on error
+   socket))
+
+(defn start-server [port]
+  (log/info "Starting Aleph server on port:" port)
+  (tcp/start-server
+   (fn [socket info]
+     (handle-connection socket info))
+   {:port port}))
+
 
 ;; ------------------------------------------------------------------------------------------- Main
 
@@ -84,19 +107,24 @@
   ;; You can use print statements as follows for debugging, they'll be visible when running tests.
   (println "Logs from your program will appear here!")
   ;; Uncomment this block to pass the first stage
-  (serve 6379 handler)
+  (start-server 6379)
   )
+
+(.addShutdownHook (Runtime/getRuntime)
+                  (Thread. #(log/info "Shutdown hook triggered")))
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 
 (comment 
   (do 
     (log/set-min-level! :trace)
-    
+
+    (def docs-command "*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n")   
     (def get-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$6\r\nHello!\r\n")
     (def ping-command "*1\r\n$4\r\nPING\r\n")
     (def set-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n"))
   
+  (handler docs-command)
   (handler ping-command)
   (handler get-command)
   (-> get-command parser/parse-resp decoder/decode)

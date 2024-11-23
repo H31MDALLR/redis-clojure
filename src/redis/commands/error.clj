@@ -1,8 +1,8 @@
 (ns redis.commands.error 
   (:require
-   [redis.commands.command :as command]
+   [redis.commands.dispatch :as dispatch]
    [redis.encoder :as encoder]))
 
-(defmethod command/command :error
+(defmethod dispatch/command-dispatch :error
   [{:keys [exception]}]
   (encoder/encode-resp {:error exception}))
