@@ -2,30 +2,53 @@
   (:gen-class)
   (:require
    [clojure.java.io :as io]
-   [clojure.string :as str]
 
    [taoensso.timbre :as log]
 
-   [redis.commands.ping :as ping])
+   [redis.commands.command :as command]
+   [redis.commands.error]
+   [redis.commands.ping]
+   [redis.commands.set]
+   [redis.decoder :as decoder]
+   [redis.parser :as parser])
   (:import
    [java.net ServerSocket]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
-(def commands 
-  {:ping ping/ping})
+
+(defn read-with-crlf [input-stream]
+  (loop [buffer (byte-array 1024)
+         output []]
+    (let [read-count (.read input-stream buffer)]
+      (if (neg? read-count)
+        output
+        (recur buffer (conj output (String. buffer 0 read-count)))))))
+
+(defn read-lines [reader]
+  (loop [output ""]
+    (let [ready? (.ready reader)]
+      (if ready? 
+        (recur (str output  (.readLine reader) "\r\n"))
+        (do 
+          (log/info ::read-lines {:output output})
+          output)))))
 
 ;; ------------------------------------------------------------------------------------------- Network I/O
 
 (defn receive-message
   "Read a line of textual data from the given socket"
   [socket]
-  (.readLine (io/reader socket)))
+  (let [r   (io/reader (.getInputStream socket))
+        msg (read-lines r)]
+    (log/info ::recieve-message {:msg r})
+    msg))
 
 (defn send-message
   "Send the given string message out over the given socket"
   [socket msg]
-  (let [writer (io/writer socket)]
-    (.write writer msg)
+  (log/info ::send-message {:msg msg})
+  (let [writer (io/writer (.getOutputStream socket))]
+    (.write writer (str msg))
     (.flush writer)))
 
 (defn serve [port handler]
@@ -36,6 +59,8 @@
 
    (with-open [sock (.accept server-sock)]
     (let [msg-in (receive-message sock)
+          _  (log/info ::serve {:msg msg-in})
+
           msg-out (handler msg-in)]
       (send-message sock msg-out)))))
 
@@ -43,14 +68,13 @@
 
 (defn handler
   [& args]
+  (log/info ::handler {:args args})
 
-  (let [command-key (-> args first str/lower-case keyword)
-        command (get commands command-key identity)]
-    (log/trace ::handler {:args args
-                          :command-key command-key
-                          :command command})
-    
-    (command (rest args))))
+  (->> args
+       first
+       parser/parse-resp
+       decoder/decode
+       command/command))
 
 ;; ------------------------------------------------------------------------------------------- Main
 
@@ -66,6 +90,20 @@
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 
 (comment 
-  (log/set-min-level! :trace)
-  (handler "PING")
-  "leave this here.")
+  (do 
+    (log/set-min-level! :trace)
+    
+    (def get-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$6\r\nHello!\r\n")
+    (def ping-command "*1\r\n$4\r\nPING\r\n")
+    (def set-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n"))
+  
+  (handler ping-command)
+  (handler get-command)
+  (-> get-command parser/parse-resp decoder/decode)
+  (serve 6379 handler)
+
+  (let [[one two] '("test" "stuff")]
+    [one two])
+
+  "leave this here."
+  )

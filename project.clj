@@ -9,7 +9,11 @@
                  [aleph "0.6.4"]
                  
                  ;; logging
-                 [com.taoensso/timbre "6.0.2"]]
+                 [com.taoensso/timbre "6.0.2"]
+                 
+                 ;; parsing
+                 [instaparse "1.5.0"]
+                 ]
 
   :main ^:skip-aot redis.core
   :target-path "/tmp/codecrafters-redis-target/%s"

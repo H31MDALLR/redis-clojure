@@ -1,4 +1,9 @@
-(ns redis.commands.ping)
+(ns redis.commands.ping
+  (:require [redis.commands.command :as command]
+            [redis.encoder :as encoder]))
 
-(defn ping [& args]
-  "+PONG\r\n")
+(defmethod command/command :ping
+  [{:keys [msg]}] 
+  (if msg 
+    (encoder/encode-resp {:simple-string msg})
+    (encoder/encode-resp {:simple-string "PONG"})))
