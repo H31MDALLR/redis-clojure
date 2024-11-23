@@ -5,4 +5,4 @@
 
 (defmethod dispatch/command-dispatch :echo
   [{:keys [message]}]
-  (encoder/encode-resp {:simple-string message}))
+  (encoder/encode-resp {:bulk-string message}))
