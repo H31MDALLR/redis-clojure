@@ -20,6 +20,11 @@
   {:command (keywordize command)
    :exception exception})
 
+(defmethod decode "GET"
+  [[command k]]
+  {:command (keywordize command)
+   :k (keywordize k)})
+
 (defmethod decode "PING"
   [[command msg]]
   {:command (keywordize command)
@@ -28,7 +33,7 @@
 (defmethod decode "SET"
   [[command k v]]
   {:command (keywordize command)
-   :k k
+   :k (keywordize k)
    :v v})
 
 

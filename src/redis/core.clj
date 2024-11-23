@@ -13,6 +13,7 @@
    [redis.commands.command]
    [redis.commands.echo]
    [redis.commands.error]
+   [redis.commands.get]
    [redis.commands.ping]
    [redis.commands.set]
    [redis.decoder :as decoder]
@@ -125,11 +126,10 @@
     (def ping-command "*1\r\n$4\r\nPING\r\n")
     (def set-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n"))
   
-  (handler docs-command)
+  (handler docs-command) 
   (handler ping-command)
   (handler get-command)
   (-> get-command parser/parse-resp decoder/decode)
-  (serve 6379 handler)
 
   (let [[one two] '("test" "stuff")]
     [one two])
