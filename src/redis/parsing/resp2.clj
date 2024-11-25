@@ -51,7 +51,8 @@
                   "$0\r\n\r\n"
                   "$-1\r\n"
                   "*2\r\n+OK\r\n:1000\r\n"
-                  "*2\r\n$3\r\nGET\r\n$5\r\napple\r\n"]]
+                  "*2\r\n$3\r\nGET\r\n$5\r\napple\r\n"
+                  "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n"]]
     (for [example examples]
       (parse-resp example)))
 

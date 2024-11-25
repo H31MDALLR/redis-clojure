@@ -23,7 +23,7 @@
       (do (log/error "NX and XX options returned from parsing. Parsing is broken!")
           (resp2/error "NX and XX options are mutually exclusive"))
       
-      (> 1 (count expiry-keys))
+      (> (count expiry-keys) 1)
       (do (log/error "Mutually exlusive expiration options made it through parsing!" (filter some? expiry-keys))
           (resp2/error (str "Expiration options are mutually exclusive, given: " (filter some? expiry-keys)))))))
 
@@ -48,13 +48,14 @@
         get-result          (when get (resp2/bulk-string (storage/retrieve k)))
         option-errors       (mutually-exclusive-options nx xx options)]
     (log/trace ::dispatch :set {:defaults defaults
-                                :options options})
+                                :options  options})
 
     (if option-errors
       option-errors
 
       ;; Expiration, NX and XX options parsing 
-      (let [value          (time/map->map-with-expiry v options)
+      (let [expiry         (time/map->map-with-expiry v options)
+            value          (into {:value v} expiry)
             encoded-result (if (or nx xx) 
                              (store-and-get k value nx xx)
                              (do (storage/store k value)

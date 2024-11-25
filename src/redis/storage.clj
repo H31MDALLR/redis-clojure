@@ -7,14 +7,13 @@
 (def backing-store (atom {}))
 
 (defn retrieve [k]
-  (let [{:keys [expiry]
-         :as   value} (get @backing-store k)]
+  (let [{:keys [value expiry] :as data} (get @backing-store k)]
     (log/trace ::retrieve {:k k
                              :v value})
     (when (seq value) (swap! backing-store 
                              assoc 
                              k 
-                             (time/update-last-read-access value)))
+                             (time/update-last-read-access data)))
 
     (if (and expiry (time/expired? expiry))
       (do 
@@ -22,7 +21,7 @@
                                :k k
                                :v value})
         (swap! backing-store dissoc k)
-       nil)
+        nil)
       value)))
 
 (defn store [k v]
