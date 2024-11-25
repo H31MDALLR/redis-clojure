@@ -21,7 +21,7 @@
    [redis.encoding.resp2 :as resp2]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
-
+(log/set-min-level! :trace)
 (defn handler
   [msg]
   (log/info ::handler {:args msg})

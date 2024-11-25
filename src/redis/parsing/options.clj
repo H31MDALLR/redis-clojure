@@ -111,21 +111,45 @@
 ;; ------------------------------------------------------------------------------------------- REPL
 (comment
 
+  (try
+    (let [examples [[3 '("SET" "apple" "pineapple" "px" "100")]
+                    [3 '("SET" "grape" "apple" "px" "100")]
+                    [1 '("COMMAND" "DOCS" "SET")]
+                    [1 '("GET" "apple")]]]
+      (for [[defaults example] examples]
+        (do (println {:defaults defaults
+                      :example  example})
+            (parse-result->command example defaults))))
+    (catch clojure.lang.ExceptionInfo e
+      (ex-data e)))
+  
   (do
     (log/set-min-level! :trace)
     ;; Define rules for Redis options
-
+    
+    
     (def ruleset (-> "redis-rules.edn"
                      (load-ruleset)))
 
     (def command-docs-command ["COMMAND" "DOCS" "SET"])
     (def set-command ["SET" "mykey" "value" "NX" "EX" "10000" "GET"])
-    (def set-error '("SET" "orange" "pear" "PX" "100")))
+    (def set-error '("SET" "orange" "pear" "px" "100"))
+    (def get-error '("GET" "apple")))
 
   (some #(when (= (:token %) "NX") %) (:set ruleset))
 
   (try
+    (parse-result->command get-error 1)
+    (catch clojure.lang.ExceptionInfo e
+      (ex-data e)))
+  
+  (try
     (parse-result->command command-docs-command 1)
+    (catch clojure.lang.ExceptionInfo e
+      (ex-data e)))
+  
+  (try
+    (parse-result->command set-command 2)
     (catch clojure.lang.ExceptionInfo e
       (ex-data e)))
   (try
@@ -149,4 +173,5 @@
               :ex  [10000]
               :get []}}
 
-  "leave this here.")
+  "leave this here."
+  )

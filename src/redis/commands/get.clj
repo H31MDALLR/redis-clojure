@@ -2,9 +2,9 @@
   (:require
    [redis.commands.dispatch :as dispatch]
    [redis.encoding.resp2 :as resp2]
-   [redis.commands.impl.get :as impl]))
+   [redis.storage :as storage]))
 
 (defmethod dispatch/command-dispatch :get
-  [{:keys [k]}]
-  (let [v (impl/key->value k)]
+  [{:keys [defaults]}]
+  (let [v (storage/retrieve (first defaults))]
     (resp2/bulk-string v)))

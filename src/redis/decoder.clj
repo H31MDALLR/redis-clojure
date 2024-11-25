@@ -25,9 +25,8 @@
    :exception exception})
 
 (defmethod decode "GET"
-  [[command k]]
-  {:command (keywordize command)
-   :k (keywordize k)})
+  [parse-result]
+ (options/parse-result->command parse-result 1))
 
 (defmethod decode "PING"
   [parse-result]

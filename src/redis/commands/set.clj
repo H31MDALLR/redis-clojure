@@ -3,7 +3,6 @@
    [taoensso.timbre :as log]
 
    [redis.commands.dispatch :as dispatch]
-   [redis.commands.impl.get :as get]
    [redis.encoding.resp2 :as resp2]
    [redis.storage :as storage]
    [redis.time :as time]))
@@ -28,10 +27,15 @@
       (do (log/error "Mutually exlusive expiration options made it through parsing!" (filter some? expiry-keys))
           (resp2/error (str "Expiration options are mutually exclusive, given: " (filter some? expiry-keys)))))))
 
-(defn set-kv
-  "Store a value v at location k"
-  [k v]
-  (swap! storage/store assoc k (time/update-write-access-time v)))
+(defn- store-and-get [k value nx xx]
+  (let [get-result          (storage/retrieve k)]
+    (storage/store k value)
+    (cond
+      (and nx (empty? get-result)) (resp2/bulk-string get-result)
+      (and nx (seq get-result)) (resp2/bulk-string nil)
+      (and xx (empty? get-result)) (resp2/bulk-string nil)
+      (and xx (seq get-result)) (resp2/bulk-string get-result))))
+
 
 ;; ------------------------------------------------------------------------------------------- Dispatch
 
@@ -39,27 +43,28 @@
   [{:keys [defaults options]}]
   (let [[k v]               defaults
         {:keys [get nx xx]} options 
-        get-result          get/key->value
+
+        ;; grab it before write ops if needed
+        get-result          (when get (resp2/bulk-string (storage/retrieve k)))
         option-errors       (mutually-exclusive-options nx xx options)]
-    (log/trace ::dispatch :set {:k k
-                                :v v})
+    (log/trace ::dispatch :set {:defaults defaults
+                                :options options})
 
     (if option-errors
       option-errors
 
       ;; Expiration, NX and XX options parsing 
       (let [value          (time/map->map-with-expiry v options)
-            encoded-result (cond
-                             (and nx (empty? get-result)) (resp2/bulk-string (set-kv k value))
-                             (and nx (seq get-result)) (resp2/bulk-string nil)
-                             (and xx (empty? get-result)) (resp2/bulk-string nil)
-                             (and xx (seq get-result)) (resp2/bulk-string (set-kv k value))
-                             :else (do (set-kv k value)
-                                       (resp2/ok)))]
-
+            encoded-result (if (or nx xx) 
+                             (store-and-get k value nx xx)
+                             (do (storage/store k value)
+                                 (resp2/ok)))]
+        
+        (log/trace ::set {:encoded-result encoded-result})
+        
         ;; GET option
         (if get 
-          (resp2/bulk-string get-result)
+          get-result
           encoded-result)))))
 
 
