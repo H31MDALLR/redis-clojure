@@ -18,10 +18,10 @@
    Returns true if the given expiration instant occured in the past."
   [expiration-instant]
   (let [now (jt/instant)
-        after? (jt/after? (jt/instant expiration-instant) now)]
+        expired? (jt/before? (jt/instant expiration-instant) now)]
     (log/trace ::expired? {:expiry expiration-instant
-                           :after after?})
-    after?))
+                           :expired? expired?})
+    expired?))
 
 (defn set-expiry-time
   [options]
