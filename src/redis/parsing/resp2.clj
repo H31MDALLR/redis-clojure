@@ -26,7 +26,8 @@
 
 ;; Parse a RESP input
 
-(defn parse-resp [input]
+(defn parse-resp 
+  [input]
   (log/trace ::parse-resp input)
   (let [result (resp-parser input)]
     (if (insta/failure? result)
@@ -62,9 +63,12 @@
     (def null-bulk-string "$0\r\n\r\n")
     (def ping-command "*1\r\n$4\r\nPING\r\n")
     (def set-command "*7\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$4\r\ntest\r\n$2\r\nPX\r\n$2\r\nNX\r\n$7\r\nKEEPTTL\r\n$3\r\nGET\r\n")
-    (def simple-string "+OK\r\n"))
+    (def simple-string "+OK\r\n")
+    
+    (def px-error "*5\r\n$3\r\nSET\r\n$6\r\norange\r\n$4\r\npear\r\n$2\r\npx\r\n$3\r\n100\r\n"))
 
 ;; Parse them
+  (parse-resp px-error)
   (parse-resp set-command)
   (parse-resp docs-command)
 

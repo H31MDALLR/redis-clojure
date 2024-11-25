@@ -2,11 +2,11 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [redis.utils :refer [keywordize]]
    [taoensso.timbre :as log]))
 
 ;; ------------------------------------------------------------------------------------------- Ruleset management
-
 (defn load-ruleset
   "Loads a ruleset from an EDN file and attaches logic functions to each command."
   [filename]
@@ -18,8 +18,20 @@
 
 (def ruleset (-> "redis-rules.edn"
                  (load-ruleset)))
-;; ------------------------------------------------------------------------------------------- Parsing
 
+(defn caseless-compare [x y]
+  (= (-> x str/lower-case)
+     (-> y str/lower-case)))
+
+;; ------------------------------------------------------------------------------------------- Parsing
+(defn matches? [rules arg]
+  ;; (and ... ) here as null check.
+  (filter #(or (and (:token %) 
+                    (caseless-compare (:token %) arg))
+               (and 
+                (:name %)
+                (caseless-compare (:name %) arg)))
+          rules))
 
 (defn find-matching-rules [rules options]
   (loop [acc       {}
@@ -27,8 +39,8 @@
     (if (empty? remaining)
       acc
       (let [[arg & _]      remaining
-                         ;; Match rule by token or name
-            matching-rules (filter #(or (= (:token %) arg) (= (:name %) arg)) rules)
+            ;; Match rule by token or name
+            matching-rules (matches? rules arg)
             rule           (first matching-rules)]
         (if rule
           (let [size              (:size rule)
@@ -107,16 +119,17 @@
                      (load-ruleset)))
 
     (def command-docs-command ["COMMAND" "DOCS" "SET"])
-    (def set-command ["SET" "mykey" "value" "NX" "EX" "10000" "GET"]))
+    (def set-command ["SET" "mykey" "value" "NX" "EX" "10000" "GET"])
+    (def set-error '("SET" "orange" "pear" "PX" "100")))
 
   (some #(when (= (:token %) "NX") %) (:set ruleset))
 
-    (try
+  (try
     (parse-result->command command-docs-command 1)
     (catch clojure.lang.ExceptionInfo e
       (ex-data e)))
   (try
-    (parse-result->command set-command 2)
+    (parse-result->command set-error 2)
     (catch clojure.lang.ExceptionInfo e
       (ex-data e)))
 
