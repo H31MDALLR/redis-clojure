@@ -1,81 +1,38 @@
 (ns redis.commands.command
   (:require
+   [clojure.edn :as edn]
+   [clojure.java.io :as io]
    [clojure.string :as str]
-
-   [taoensso.timbre :as log]
-
    [redis.commands.dispatch :as dispatch]
-   [redis.encoder :as encoder]))
+   [redis.encoding.resp2 :as resp2]
+   [redis.utils :refer [keywordize]]
+   [taoensso.timbre :as log]))
 
-;; ------------------------------------------------------------------------------------------- Command Handling
+;; ------------------------------------------------------------------------------------------- Layer 0
+;; -------------------------------------------------------- Command Handling
 
 (defmulti exec-command (fn [args] (-> args first str/lower-case keyword)))
-(defmethod exec-command :docs [_]
-  (encoder/encode-resp
-   {:array [{:array [{:bulk-string "COMMAND DOC"}
-                     {:array [{:bulk-string "summary"}
-                              {:bulk-string "Command documentation"}
-                              {:bulk-string "since"}
-                              {:bulk-string "1.0.0"}
-                              {:bulk-string "group"}
-                              {:bulk-string "string"}
-                              {:bulk-string "complexity"}
-                              {:bulk-string "O(1)"}
-                              {:bulk-string "history"}
-                              {:array []}
-                              {:bulk-string "arguments"}
-                              {:array []}]}]}
-            {:array [{:bulk-string "GET"}
-                     {:array [{:bulk-string "summary"}
-                              {:bulk-string "Gets a value for the given key."}
-                              {:bulk-string "since"}
-                              {:bulk-string "1.0.0"}
-                              {:bulk-string "group"}
-                              {:bulk-string "string"}
-                              {:bulk-string "complexity"}
-                              {:bulk-string "O(1)"}
-                              {:bulk-string "history"}
-                              {:array []}
-                              {:bulk-string "arguments"}
-                              {:array []}]}]}
-            {:array [{:bulk-string "PING"}
-                     {:array [{:bulk-string "summary"}
-                              {:bulk-string "Ping the server."}
-                              {:bulk-string "since"}
-                              {:bulk-string "1.0.0"}
-                              {:bulk-string "group"}
-                              {:bulk-string "connection"}
-                              {:bulk-string "complexity"}
-                              {:bulk-string "O(1)"}
-                              {:bulk-string "history"}
-                              {:array []}
-                              {:bulk-string "arguments"}
-                              {:array []}]}]}
-            {:array [{:bulk-string "SET"}
-                     {:array [{:bulk-string "summary"}
-                              {:bulk-string "Sets a value for the given key."}
-                              {:bulk-string "since"}
-                              {:bulk-string "1.0.0"}
-                              {:bulk-string "group"}
-                              {:bulk-string "string"}
-                              {:bulk-string "complexity"}
-                              {:bulk-string "O(1)"}
-                              {:bulk-string "history"}
-                              {:array [{:array [{:bulk-string "2.6.12"}
-                                                {:bulk-string "Added the `EX`, `PX`, `NX` and `XX` options."}]}
-                                       {:array [{:bulk-string "6.0.0"}
-                                                {:bulk-string "Added the `KEEPTTL` option."}]}
-                                       {:array [{:bulk-string "6.2.0"}
-                                                {:bulk-string "Added the `GET`, `EXAT` and `PXAT` option."}]}]}
-                              {:bulk-string "arguments"}
-                              {:array []}]}]}]}))
+(defmethod exec-command :docs [[_ subcommand]]
+  (let [docs (->  (io/resource "docs.edn")
+                  slurp
+                  edn/read-string)]
+    (if subcommand 
+      (let [docs (->  (io/resource "docs.edn")
+                      slurp
+                      edn/read-string
+                      (get (keywordize subcommand)))]
+        (resp2/encode-resp {:array docs}))
+      
+      ;; all docs
+      (let [alldocs (-> docs
+                        vals
+                        flatten
+                        merge
+                        vec)]
+        (resp2/encode-resp {:array alldocs})))))
 
-
-
-
-;; ------------------------------------------------------------------------------------------- Dispatch
-
-
+;; ------------------------------------------------------------------------------------------- Layer 1
+;; -------------------------------------------------------- Dispatch
 (defmethod dispatch/command-dispatch :command
   [{:keys [args]}]
   (log/info ::command-dispatch :command {:args args})
@@ -83,3 +40,23 @@
 
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA
+(comment
+
+  (let [docs (->  (io/resource "docs.edn")
+                  slurp
+                  edn/read-string
+                  vals
+                  flatten
+                  merge
+                  vec)]
+    (resp2/encode-resp {:array docs}))
+  
+  (let [subcommand "SET"
+        docs (->  (io/resource "docs.edn")
+                  slurp
+                  edn/read-string
+                  (get (keywordize subcommand)))]
+    (resp2/encode-resp {:array docs}))
+  
+  "Leave this here."
+  )

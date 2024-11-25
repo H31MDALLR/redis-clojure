@@ -1,10 +1,10 @@
 (ns redis.commands.get
   (:require
    [redis.commands.dispatch :as dispatch]
-   [redis.encoder :as encoder]
-   [redis.storage :as storage]))
+   [redis.encoding.resp2 :as resp2]
+   [redis.commands.impl.get :as impl]))
 
 (defmethod dispatch/command-dispatch :get
   [{:keys [k]}]
-  (let [v (get @storage/store k)]
-    (encoder/encode-resp {:bulk-string v})))
+  (let [v (impl/key->value k)]
+    (resp2/bulk-string v)))

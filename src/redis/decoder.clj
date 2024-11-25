@@ -1,8 +1,13 @@
 (ns redis.decoder 
   (:require
-   [clojure.string :as str]))
+   [redis.parsing.options :as options]
+   [redis.utils :refer [keywordize]]))
 
-(defn keywordize [s] (-> s str/lower-case keyword))
+;; ------------------------------------------------------------------------------------------- Layer 0
+
+
+;; ------------------------------------------------------------------------------------------- Layer 1
+;; -------------------------------------------------------- Decode Interface
 
 (defmulti decode (fn [coll] (first coll)))
 (defmethod decode "COMMAND"
@@ -11,9 +16,8 @@
    :args args})
 
 (defmethod decode "ECHO"
-  [[command message]]
-  {:command (keywordize command)
-   :message message})
+  [parse-result]
+  (options/parse-result->command parse-result 1))
 
 (defmethod decode "ERROR"
   [[command exception]]
@@ -26,16 +30,14 @@
    :k (keywordize k)})
 
 (defmethod decode "PING"
-  [[command msg]]
-  {:command (keywordize command)
-   :msg msg})
+  [parse-result]
+ (options/parse-result->command parse-result 1))
 
 (defmethod decode "SET"
-  [[command k v]]
-  {:command (keywordize command)
-   :k (keywordize k)
-   :v v})
+   [parse-result]
+  (options/parse-result->command parse-result 2))
 
+;; ------------------------------------------------------------------------------------------- REPL Area
 
 (comment 
   

@@ -17,8 +17,8 @@
    [redis.commands.ping]
    [redis.commands.set]
    [redis.decoder :as decoder]
-   [redis.parser :as parser]
-   [redis.encoder :as encoder]))
+   [redis.parsing.resp2 :as parser]
+   [redis.encoding.resp2 :as resp2]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
 
@@ -69,7 +69,7 @@
                         (d/recur))))
           (d/catch
            (fn [ex]
-             (s/put! s (encoder/encode-error ex))
+             (s/put! s (resp2/error ex))
              (s/close! s)))))))
 
 (defn handle-message [message socket]
@@ -121,15 +121,16 @@
   (do 
     (log/set-min-level! :trace)
 
+    (def set-command "*7\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$4\r\ntest\r\n$2\r\nPX\r\n$2\r\nNX\r\n$7\r\nKEEPTTL\r\n$3\r\nGET\r\n")
     (def docs-command "*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n")   
     (def get-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$6\r\nHello!\r\n")
-    (def ping-command "*1\r\n$4\r\nPING\r\n")
-    (def set-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n"))
+    (def ping-command "*1\r\n$4\r\nPING\r\n"))
   
+  (ns-unalias *ns* 'encoder)
   (handler docs-command) 
   (handler ping-command)
   (handler get-command)
-  (-> get-command parser/parse-resp decoder/decode)
+  (-> set-command parser/parse-resp decoder/decode)
 
   (let [[one two] '("test" "stuff")]
     [one two])

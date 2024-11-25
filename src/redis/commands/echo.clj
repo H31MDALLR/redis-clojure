@@ -1,8 +1,8 @@
 (ns redis.commands.echo
   (:require
    [redis.commands.dispatch :as dispatch]
-   [redis.encoder :as encoder]))
+   [redis.encoding.resp2 :as resp2]))
 
 (defmethod dispatch/command-dispatch :echo
   [{:keys [message]}]
-  (encoder/encode-resp {:bulk-string message}))
+  (resp2/bulk-string message))

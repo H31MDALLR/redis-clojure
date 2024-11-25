@@ -1,26 +1,26 @@
-(ns redis.encoder 
+(ns redis.encoding.resp2 
   (:require
-    [redis.parser :as parser]))
+    [redis.parsing.resp2 :as parser]))
 
 ;; ------------------------------------------------------------------------------------------- RESPN Encoding
 
 (declare encode-resp)
 
-(defn encode-simple-string [text]
+(defn simple-string [text]
   (str "+" text "\r\n"))
 
-(defn encode-error [text]
+(defn error [text]
   (str "-" text "\r\n"))
 
-(defn encode-integer [num]
+(defn integer [num]
   (str ":" num "\r\n"))
 
-(defn encode-bulk-string [data]
+(defn bulk-string [data]
   (if (nil? data)
     "$-1\r\n"  ; RESP NULL Bulk String
     (str "$" (count data) "\r\n" data "\r\n")))
 
-(defn encode-array [elements]
+(defn array [elements]
   (if (nil? elements)
     "*-1\r\n"  ; RESP NULL Array
     (let [encoded-elements (map encode-resp elements)]
@@ -29,16 +29,19 @@
 ;; ------------------------------------------------------------------------------------------- Public API
 (defn encode-resp [element]
   (cond
-    (:simple-string element) (encode-simple-string (:simple-string element))
-    (:error element)         (encode-error (:error element))
-    (:integer element)       (encode-integer (:integer element))
-    (:bulk-string element)   (encode-bulk-string (:bulk-string element))
-    (:array element)         (encode-array (:array element))
+    (:simple-string element) (simple-string (:simple-string element))
+    (:error element)         (error (:error element))
+    (:integer element)       (integer (:integer element))
+    (:bulk-string element)   (bulk-string (:bulk-string element))
+    (:array element)         (array (:array element))
     :else (throw (ex-info "Unknown RESP element" {:element element}))))
+
+(defn ok []
+  (simple-string "OK"))
 
 ;; ------------------------------------------------------------------------------------------- REPL
 (comment 
-  (require '[redis.parser :as parser])
+  (require '[redis.parsing.resp2 :as parser])
   (-> {:array [{:integer 1}
                {:bulk-string "hello"}
                {:simple-string "world"}]}

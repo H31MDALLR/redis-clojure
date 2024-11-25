@@ -1,0 +1,70 @@
+{:command-docs [{:bulk-string "COMMAND DOC"}
+                {:array [{:bulk-string "summary"}
+                         {:bulk-string "Command documentation"}
+                         {:bulk-string "since"}
+                         {:bulk-string "1.0.0"}
+                         {:bulk-string "group"}
+                         {:bulk-string "string"}
+                         {:bulk-string "complexity"}
+                         {:bulk-string "O(1)"}
+                         {:bulk-string "history"}
+                         {:array []}
+                         {:bulk-string "arguments"}
+                         {:array []}]}]
+ :echo [{:bulk-string "ECHO"}
+        {:array [{:bulk-string "summary"}
+                 {:bulk-string "Echo the message back."}
+                 {:bulk-string "since"}
+                 {:bulk-string "1.0.0"}
+                 {:bulk-string "group"}
+                 {:bulk-string "connection"}
+                 {:bulk-string "complexity"}
+                 {:bulk-string "O(1)"}
+                 {:bulk-string "history"}
+                 {:array []}
+                 {:bulk-string "arguments"}
+                 {:array []}]}]
+ :get [{:bulk-string "GET"}
+       {:array [{:bulk-string "summary"}
+                {:bulk-string "Gets a value for the given key."}
+                {:bulk-string "since"}
+                {:bulk-string "1.0.0"}
+                {:bulk-string "group"}
+                {:bulk-string "string"}
+                {:bulk-string "complexity"}
+                {:bulk-string "O(1)"}
+                {:bulk-string "history"}
+                {:array []}
+                {:bulk-string "arguments"}
+                {:array []}]}]
+ :ping [{:bulk-string "PING"}
+        {:array [{:bulk-string "summary"}
+                 {:bulk-string "Ping the server."}
+                 {:bulk-string "since"}
+                 {:bulk-string "1.0.0"}
+                 {:bulk-string "group"}
+                 {:bulk-string "connection"}
+                 {:bulk-string "complexity"}
+                 {:bulk-string "O(1)"}
+                 {:bulk-string "history"}
+                 {:array []}
+                 {:bulk-string "arguments"}
+                 {:array []}]}]
+ :set [{:bulk-string "SET"}
+       {:array [{:bulk-string "summary"}
+                {:bulk-string "Sets a value for the given key."}
+                {:bulk-string "since"}
+                {:bulk-string "1.0.0"}
+                {:bulk-string "group"}
+                {:bulk-string "string"}
+                {:bulk-string "complexity"}
+                {:bulk-string "O(1)"}
+                {:bulk-string "history"}
+                {:array [{:array [{:bulk-string "2.6.12"}
+                                  {:bulk-string "Added the `EX`, `PX`, `NX` and `XX` options."}]}
+                         {:array [{:bulk-string "6.0.0"}
+                                  {:bulk-string "Added the `KEEPTTL` option."}]}
+                         {:array [{:bulk-string "6.2.0"}
+                                  {:bulk-string "Added the `GET`, `EXAT` and `PXAT` option."}]}]}
+                {:bulk-string "arguments"}
+                {:array []}]}]}
