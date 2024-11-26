@@ -34,6 +34,7 @@
           rules))
 
 (defn find-matching-rules [rules options]
+  (log/trace ::find-matching-rules {:options options})
   (loop [acc       {}
          remaining options]
     (if (empty? remaining)
@@ -42,6 +43,8 @@
             ;; Match rule by token or name
             matching-rules (matches? rules arg)
             rule           (first matching-rules)]
+        (log/trace ::find-matching-rules {:arg arg
+                                          :rule rule})
         (if rule
           (let [size              (:size rule)
                 to-consume        (take size remaining)
@@ -52,7 +55,9 @@
                      remaining-options)
               (throw (ex-info "Insufficient arguments for rule" {:rule rule
                                                                  :args to-consume}))))
-          (throw (ex-info "Unknown argument" {:arg arg})))))))
+          (do 
+            (log/error ::find-matching-rules :anomalies/not-found arg)
+            (throw (ex-info "Unknown argument" {:arg arg}))))))))
 
 (defn validate-exclusivity-rules
   "Make sure that if a group is exclusive, we do not have multiple arguments from that group"
@@ -92,6 +97,8 @@
    Output:
      A map with formatted defaults and options."
   [[command & args] defaults-count]
+  (log/trace ::parse-result->command {:command command
+                                      :args args})
   (let [[defaults options] (split-at defaults-count args) ; Separate defaults and options
         rules              (get ruleset (keywordize command))
         parsed             (find-matching-rules rules options)]
@@ -109,21 +116,28 @@
 
 
 ;; ------------------------------------------------------------------------------------------- REPL
-(comment
+(comment 
 
-  (try
-    (let [examples [[3 '("SET" "apple" "pineapple" "px" "100")]
-                    [3 '("SET" "grape" "apple" "px" "100")]
-                    [1 '("COMMAND" "DOCS" "SET")]
-                    [1 '("GET" "apple")]
-                    [1 '("ECHO" "banana")]]]
-      (for [[defaults example] examples]
-        (do (println {:defaults defaults
-                      :example  example})
-            (parse-result->command example defaults))))
-    (catch clojure.lang.ExceptionInfo e
-      (ex-data e)))
-  
+;; --------------------------------------------------------- all at once
+  (do 
+    (log/set-min-level! :trace)
+    (try
+      (let [examples [[2 '("COMMAND" "DOCS" "SET")]
+                      [2 '("CONFIG" "GET" "dir")]
+                      [1 '("GET" "apple")]
+                      [1 '("ECHO" "banana")]
+                      [2 '("SET" "mykey" "value" "NX" "EX" "10000" "GET")]
+                      [2 '("SET" "apple" "pineapple" "px" "100")]
+                      [2 '("SET" "grape" "apple" "px" "100")]]]
+        (map (fn [sample]
+               (let [[defaults example] sample] 
+                 (parse-result->command example defaults)))
+             examples))
+      (catch clojure.lang.ExceptionInfo e
+        (ex-data e))))
+
+;; --------------------------------------------------------- Individual rules
+
   (do
     (log/set-min-level! :trace)
     ;; Define rules for Redis options
@@ -138,8 +152,6 @@
     (def get-error '("GET" "apple"))
     (def echo-error '("ECHO" "banana")))
 
-  (some #(when (= (:token %) "NX") %) (:set ruleset))
-
   (try
     (parse-result->command echo-error 1)
     (catch clojure.lang.ExceptionInfo e
@@ -151,7 +163,7 @@
       (ex-data e)))
   
   (try
-    (parse-result->command command-docs-command 1)
+    (parse-result->command command-docs-command 2)
     (catch clojure.lang.ExceptionInfo e
       (ex-data e)))
   
@@ -173,6 +185,7 @@
 
   (->> ruleset
        :command)
+  (some #(when (= (:token %) "NX") %) (:set ruleset))
 
   {:command  :set,
    :defaults ["mykey" "value"],

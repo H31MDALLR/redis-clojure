@@ -10,11 +10,18 @@
                  ;; configuration 
                  [integrant "0.13.1"]
                  
+                 ;; exception utils
+                 [org.apache.commons/commons-lang3 "3.17.0"]
+                 
                  ;; logging
                  [com.taoensso/timbre "6.0.2"]
                  
                  ;; parsing
                  [instaparse "1.5.0"]
+
+                 ;; state management
+                 [aero "1.1.6"]
+                 [integrant "0.13.1"]
 
                  ;; time 
                  [clojure.java-time "1.4.3"]

@@ -1,0 +1,8 @@
+{:adapter/aleph {:env #ig/ref :env/environment
+                 :port 6379
+                 :handlers {:connection #ig/ref :handler/handle-connection}
+                 :rdb #ig/ref :persistence/rdb} 
+ :env/environment {:env #or [#env ENVIRONMENT "localhost"]}
+ :handler/handle-connection {}
+ :persistence/rdb {:dir  "/tmp/redis-data"
+                   :dbfilename "redis.rdb"}}
