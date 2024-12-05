@@ -9,30 +9,38 @@
 ;; ------------------------------------------------------------------------------------------- Layer 1
 ;; -------------------------------------------------------- Decode Interface
 
-(defmulti decode (fn [coll] (first coll)))
-(defmethod decode "COMMAND"
+(defmulti decode (fn [coll] (-> coll first keywordize)))
+(defmethod decode :command
   [[command & args]]
   {:command (keywordize command)
    :args args})
 
-(defmethod decode "ECHO"
+;; special
+(defmethod decode :config
+  [[command & args]]
+  (let [[subcommand & options] args]
+    {:command (keywordize command)
+     :subcommand subcommand
+     :options options}))
+
+(defmethod decode :echo
   [parse-result]
   (options/parse-result->command parse-result 1))
 
-(defmethod decode "ERROR"
+(defmethod decode :error
   [[command exception]]
   {:command (keywordize command)
    :exception exception})
 
-(defmethod decode "GET"
+(defmethod decode :get
   [parse-result]
  (options/parse-result->command parse-result 1))
 
-(defmethod decode "PING"
+(defmethod decode :ping
   [parse-result]
  (options/parse-result->command parse-result 1))
 
-(defmethod decode "SET"
+(defmethod decode :set
    [parse-result]
   (options/parse-result->command parse-result 2))
 

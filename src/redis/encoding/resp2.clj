@@ -39,6 +39,12 @@
 (defn ok []
   (simple-string "OK"))
 
+(defn coll->resp2-array [coll]
+  (->> coll
+       (map (fn [element] {:bulk-string element}))
+       array))
+
+
 ;; ------------------------------------------------------------------------------------------- REPL
 (comment 
   (require '[redis.parsing.resp2 :as parser])

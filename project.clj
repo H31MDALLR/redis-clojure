@@ -7,12 +7,18 @@
                  [org.clojure/core.async "1.6.681"]
                  [org.clojure/tools.cli "1.1.230"]
 
+                 ;; caommand line
+                 [org.clojure/tools.cli "1.1.230"]
+                 
+                 ;; compression
+                 [com.ning/compress-lzf "1.1.2"]
+                 
                  ;; configuration 
                  [integrant "0.13.1"]
-                 
+
                  ;; exception utils
                  [org.apache.commons/commons-lang3 "3.17.0"]
-                 
+
                  ;; logging
                  [com.taoensso/timbre "6.0.2"]
                  
@@ -23,12 +29,15 @@
                  [aero "1.1.6"]
                  [integrant "0.13.1"]
 
+                 ;; streaming i/o
+                 [org.clj-commons/byte-streams "0.3.4"]
+                 [org.clj-commons/gloss "0.3.6"]
+
                  ;; time 
                  [clojure.java-time "1.4.3"]
 
                  ;; web
                  [aleph "0.6.4"]
-                 [org.clj-commons/gloss "0.3.6"]
                  
                  ]
 

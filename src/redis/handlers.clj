@@ -8,6 +8,7 @@
 
               [redis.commands.dispatch :as dispatch]
               [redis.commands.command]
+              [redis.commands.config]
               [redis.commands.echo]
               [redis.commands.error]
               [redis.commands.get]

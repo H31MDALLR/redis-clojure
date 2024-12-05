@@ -14,6 +14,7 @@
 
 (defmethod aero.core/reader 'ig/ref
   [{:keys [profile]
+    :or {profile "localhost"}
     :as   opts} tag value]
   (ig/ref value))
 
@@ -44,12 +45,19 @@
   (reset! config nil)
   (get-configuration))
 
-(defn get-value [k] (get (get-configuration) k))
+(defn get-value [path] 
+  (log/trace ::get-value path)
+  (get-in (get-configuration) path))
+
+(defn write [path v]
+  (swap! config assoc-in path v))
+
+;; -------------------------------------------------------- REPL
 
 (comment 
   (reset! config nil)
   (get-configuration)
 
-  (get-value :persistence/rdb)
+  (get-value [:redis/config "dir"])
 
   ::leave-this-here)

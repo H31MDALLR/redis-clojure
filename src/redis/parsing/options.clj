@@ -137,7 +137,7 @@
         (ex-data e))))
 
 ;; --------------------------------------------------------- Individual rules
-
+  
   (do
     (log/set-min-level! :trace)
     ;; Define rules for Redis options

@@ -12,40 +12,63 @@
    [redis.config :as config]))
 
 ;; ------------------------------------------------------------------------------------------- Layer 0
+
+
 ;; -------------------------------------------------------- Command Handling
 
 (defmulti exec-command
-  (fn [defaults _]
-    (-> defaults first str/lower-case keyword)))
+  (fn [subcommand _] subcommand))
 
+;; TBD - support glob style pattern search over our keys
+;;  CONFIG GET takes multiple arguments, which are glob-style patterns. 
+;;  Any configuration parameter matching any of the patterns are 
+;;  reported as a list of key-value pairs.
+                                          
 (defmethod exec-command :get
-  [[_ key] _]
-  (log/trace ::exec-command :get {:key key})
-  (let [config-value (-> :persistence/rdb 
-                         config/get-value 
-                         (get (keyword key)))]
-    (resp2/bulk-string config-value)))
+  [_ key-coll]
+  (log/trace ::exec-command :get {:keys key-coll})
+  (let [config-values (reduce (fn [acc curr] 
+                                (let [value (config/get-value [:redis/config (keywordize curr)])]
+                                  (-> acc
+                                      (conj curr)
+                                      (conj value))))
+                              []
+                              key-coll)
+        get-response  (resp2/coll->resp2-array config-values)]
+    (log/trace ::exec-command :get {:response get-response})
+    get-response))
 
-(defmethod exec-command :help [[_ opts]])
-(defmethod exec-command :resetstat [[_ opts]])
-(defmethod exec-command :rewrite [[_ opts]])
-(defmethod exec-command :set [[_ opts]])
+(defmethod exec-command :help [_ _])
+(defmethod exec-command :resetstat [_  opts])
+(defmethod exec-command :rewrite [_  opts])
+(defmethod exec-command :set [_  kv-coll]
+  (doseq [[k v] (partition 2 kv-coll)]
+    (config/write [:redis/config (keywordize k)] v))
+  (resp2/ok))
 
 ;; ------------------------------------------------------------------------------------------- Layer 1
 ;; -------------------------------------------------------- Dispatch
 (defmethod dispatch/command-dispatch :config
-  [{:keys [defaults options]}]
-  (log/info ::command-dispatch :config {:subcommand (first defaults)
+  [{:keys [subcommand options]}] 
+  (log/info ::command-dispatch :config {:subcommand subcommand
                                         :options    options})
-  (exec-command defaults options))
+  (exec-command (keywordize subcommand) options))
 
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 (comment 
   (ns-unalias *ns* 'exec-command)
-  (-> :persistence/rdb config/get-value (get (keyword "dir")))
-  
-  (exec-command ["GET" "dir"] {})
+  (-> :redis/config config/get-value (get (keyword "maxA")))
+
+  (config/get-value [:redis/config "maxA"])
+  (dispatch/command-dispatch )
+  (exec-command :set ["maxA" "test" "maxB" "test2" "maxC" :stuff])
+  (exec-command :get ["dir" "dbfilename"])
   (exec-command ["HELP"] {})
 
-  "Leave this here.")
+  (let [config-values (doall (map (fn [k] (config/get-value [:redis/config (keywordize k)])) 
+                                  ["dir" "dbfilename"]))]
+     (resp2/bulk-string config-values))
+
+  "Leave this here."
+  )

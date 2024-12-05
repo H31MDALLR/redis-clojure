@@ -9,7 +9,10 @@
   (:import
    [org.apache.commons.lang3.exception ExceptionUtils]))
 
-;; ------------------------------------------------------------------------------------------- State Handlers
+;; state
+(def cli-opts (atom {}))
+
+;; ---------------------------------------------------------------------------- State Handlers
 ;; -------------------------------------------------------- Aleph
 (defmethod ig/init-key :adapter/aleph [_ {:keys [handlers port rdb]
                                           :as   opts}]
@@ -43,14 +46,23 @@
 
 
 ;; -------------------------------------------------------- Persistence
-(defmethod ig/init-key :persistence/rdb [_ opts]
-  (log/trace ::init-key :persistence/rdb opts)
-  opts)
+(defmethod ig/init-key :redis/config [_ opts]
+  (log/trace ::init-key :redis/config opts)
+  (let [{:keys [dbfilename dir] :as service-config} @cli-opts]
+    (merge opts service-config)))
 
-;; ------------------------------------------------------------------------------------------- Run Server
 
-(defn run []
-  (let [system (ig/init (config/get-configuration))]
+;; ---------------------------------------------------------------------------- Run Server
+
+(defn run 
+  "Start the system, with an optional set of arguments that override configuration."
+  [options]
+  (when (seq options)
+    (reset! cli-opts options))
+
+  (let [ system (ig/init (config/get-configuration))]
+    ;; if we have any cli options, merge them in
+
     (println "Service started...")
 
     (runtime/set-default-uncaught-exception-handler!
