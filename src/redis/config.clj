@@ -50,6 +50,8 @@
   (get-in (get-configuration) path))
 
 (defn write [path v]
+  (log/trace ::write {:path path 
+                      :value v})
   (swap! config assoc-in path v))
 
 ;; -------------------------------------------------------- REPL

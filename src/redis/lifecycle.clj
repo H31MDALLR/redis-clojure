@@ -48,8 +48,14 @@
 ;; -------------------------------------------------------- Persistence
 (defmethod ig/init-key :redis/config [_ opts]
   (log/trace ::init-key :redis/config opts)
-  (let [{:keys [dbfilename dir] :as service-config} @cli-opts]
-    (merge opts service-config)))
+  (let [service-config (-> @cli-opts :options)
+        config-db (merge opts service-config)]
+    (log/trace ::init-key :redis/config {:opts opts
+                                         :cli-config service-config})
+    (doseq [kv config-db]
+      (config/write [:redis/config (key kv)] (val kv)))
+    
+    config-db))
 
 
 ;; ---------------------------------------------------------------------------- Run Server
@@ -57,10 +63,11 @@
 (defn run 
   "Start the system, with an optional set of arguments that override configuration."
   [options]
+  (log/trace ::run options)
   (when (seq options)
     (reset! cli-opts options))
 
-  (let [ system (ig/init (config/get-configuration))]
+  (let [system (ig/init (config/get-configuration))]
     ;; if we have any cli options, merge them in
 
     (println "Service started...")
