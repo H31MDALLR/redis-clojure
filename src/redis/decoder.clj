@@ -36,6 +36,10 @@
   [parse-result]
  (options/parse-result->command parse-result 1))
 
+(defmethod decode :keys
+  [parse-result]
+ (options/parse-result->command parse-result 1))
+
 (defmethod decode :ping
   [parse-result]
  (options/parse-result->command parse-result 1))
@@ -44,7 +48,7 @@
    [parse-result]
   (options/parse-result->command parse-result 2))
 
-;; ------------------------------------------------------------------------------------------- REPL Area
+;; ---------------------------------------------------------------------------- REPL Area
 
 (comment 
   

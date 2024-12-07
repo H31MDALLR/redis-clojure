@@ -1,0 +1,63 @@
+;; https://gist.github.com/Chubek/42ec6e7b65d17888eeaaaad50738bff9
+(def glob-grammar
+  "
+; High-level constructs
+word = glob-word
+     | identifier
+     | quoted-literal
+     | literal
+
+glob-word = glob-element*
+
+glob-element = glob-bracket
+             | glob-char
+
+glob-char = glob-literal-char
+          | glob-match-many
+          | glob-match-one
+
+; Define bracket chars without matching the closing bracket
+glob-bracket = glob-bracket-pos | glob-bracket-neg
+glob-bracket-pos = '[' bracket-chars ']' 
+glob-bracket-neg = ('[!' | '[^') bracket-chars ']'
+
+; bracket-chars: zero or more characters that are not ']'
+bracket-chars = #\"[^]]*\"
+
+quoted-literal = single-quote | double-quote
+
+single-quote = \"'\" literal* \"'\"
+double-quote = '\"' literal* '\"'
+
+identifier = identifier-prefix identifier-suffix*
+
+; Literals and characters
+literal = printable*
+
+; Basic units
+glob-literal-char = printable
+glob-match-many = '*'
+glob-match-one = '?'
+
+identifier-prefix = alphabetic | '_'
+identifier-suffix = alphanumeric | '_'
+
+alphabetic = upper-case | lower-case
+alphanumeric = alphabetic | digit
+
+digit = #\"[0-9]\"
+upper-case = #\"[A-Z]\"
+lower-case = #\"[a-z]\"
+
+; Using a regex class for punctuation including backslash
+; Make sure to escape backslash properly
+punctuation = #\"[.,;:!?\\-_(){}\\[\\]\"'`@#$%^&*+=<>/|~\\\\]\"
+
+whitespace = #\"[ \\t]\"
+printable = punctuation | alphanumeric | whitespace
+")
+
+;; Example usage:
+;; (require '[instaparse.core :as insta])
+;; (def parser (insta/parser glob-grammar))
+;; (parser "foo*bar?[!abc]")
