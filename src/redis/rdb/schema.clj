@@ -99,7 +99,7 @@
     (parse-length)
     (fn [{:keys [size special]
           :as   header}]
-      (log/info ::parse-string header)
+      (log/trace ::parse-string header)
       (if special
           ;; Special encoding
         (condp = special
@@ -406,7 +406,17 @@
 
 (defn parse-quicklist2
   []
-  (compile-frame (parse-string)))
+  (header
+   (ordered-map :unknown :uint64
+                :content (gloss/repeated :byte :delimiters [-1]))
+   (fn [{:keys [content unknown]}]
+          ;; solely to log parsing in this foresaken structure lol.
+     (log/trace ::parse-stream-listpack3 {:unknown unknown
+                                          :content  content})
+     (ordered-map :type :RDB_TYPE_LIST_QUICKLIST_2
+                  :unknown unknown
+                  :content content))
+   identity))
 
 (defn parse-zset-listpacks
   []
@@ -486,7 +496,7 @@
                :next-entry ()))
 
 (defcodec eof
-  (ordered-map :type :eof))
+  gloss/nil-frame)
 
 (defcodec resizedb-info
   (ordered-map :type :resizdb-info
@@ -515,19 +525,28 @@
   (header
    (parse-header-byte)
    (fn [header]
-     (println ::section-selector header)
+     (log/trace ::section-selector {:header header})
      (case header
        :RDB_OPCODE_AUX auxiliary-field
        :RDB_OPCODE_RESIZEDB resizedb-info
        :RDB_OPCODE_SELECTDB selectdb
-       :RDB_OPCODE_EOF eof
+       :RDB_OPCODE_EOF gloss/nil-frame
        (parse-key-value header)))
    (fn [body]
-     (println ::section-selector body)
+     (log/trace ::section-selector {:frame body})
      body)))
 
 
-(defcodec sections (repeated section-selector))
+(defcodec sections
+  (repeated section-selector :prefix :none :delimiters [-1]))
+
+(defcodec sections-debug
+  (repeated (header section-selector
+                    (fn [frame]
+                      (println ::sections-frame-parsed frame)
+                      frame)
+                    identity)
+            :delimiters [-1]))
 
 (defcodec rdb-file
   [rdb-header sections])
@@ -538,6 +557,7 @@
 
 
 (comment
+  (ns-unalias *ns* 'header)
   (do
     (log/set-min-level! :trace)
 
@@ -585,8 +605,8 @@
                     :content (parse-string))
        (fn [{:keys [content metadata stream-id listpack-size elements-count]}]
          (log/trace ::parse-stream-listpack3 {:metadata  metadata ;; unknown at this point
-                                              :stream-id      stream-id
-                                              :content  content})
+                                              :stream-id stream-id
+                                              :content   content})
      ;; Continue with listpack parsing
          (ordered-map :type :RDB_TYPE_STREAM_LISTPACKS_3
                       :metadata-size metadata
@@ -603,85 +623,94 @@
        identity))
 
 
+
     (defcodec test [rdb-header
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    (parse-header-byte)
-                    (parse-string)
-                    ;; (parse-length)
-                    ;; (parse-length)
-                    ;; (compile-frame [:uint64-be :uint24-be])
-                    (parse-stream-listpack-3)
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
 
-                    ;(parse-stream-listpack-3)
-                    ;(gloss/string :utf8 :length 4)
-                    ;:byte
-                    ;(gloss/string-float :ascii :length 111)
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    section-selector
+                    ;sections
 
-                    ;;  :(parse-header-byte) 
-                    ;;  :redis-ver auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :redis-bits auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :ctime auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :used-mem auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :aof-base auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :dbselector selectdb
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :resizedb resizedb-info
-                    ;; :kv-pair-header kv-pair-header
-                    ;; :ziplist length-encoding
-                    ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :next (expiry-or-value-type)
-                     ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :next (expiry-or-value-type)
-                    ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :intset kv-pair-header
-                    ;; :intset-value intset-encoding
-                    ;; :next (expiry-or-value-type)
 
-                    #_(repeated section-selector :prefix :none)])
+
+                    #_(repeated section-selector :prefix :none :delimiters [-1])])
 
     (defcodec db [:header rdb-header
-                  (repeated section-selector :prefix :none)])
+                  sections])
     (try
       (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file db))
       (catch Exception e
         (ex-message e))))
 
-  (do
-    (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file db))
-    (let [results (-> decoder-ring-magic-header
-                      ms/take!
-                      d/unwrap)
-          results (apply-f-to-key results :k binary-array->string)]
-      (pp/pprint results))
+  (let [results @(-> decoder-ring-magic-header
+                     ms/take!)
+        results (apply-f-to-key results :k binary-array->string)]
+    (pp/pprint results))
 
-    (def decoder-ring (gloss.io/decode-stream test-file section-selector))
-    (ms/take! decoder-ring))
-   (binary-array->string (byte-array [105 110 116 101 103 101 114 115 116 114 105 110 103]))
+  (do
+    (require  '[clj-commons.byte-streams :as bs]
+              '[clojure.java.io :as io]
+              '[clojure.pprint :as pp]
+              '[clojure.walk :as walk]
+              '[manifold.deferred :as d]
+              '[manifold.stream :as ms])
+    
+    (def test-file (-> (io/resource "test/rdb/dump.rdb")
+                       io/input-stream
+                       (bs/convert (bs/stream-of bytes))
+                       #_bs/stream-of))
+    (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file rdb-header)) 
+
+    #_@(ms/take! section-reader)
+    (defn apply-f-to-key [m k f]
+      (walk/postwalk
+       (fn [x]
+         (if (and (map? x) (contains? x k))
+           (update x k f)
+           x))
+       m))
+    
+    (defn deserialize [source]
+      (loop [source source
+             result []]
+        (let [parsed (first source)]
+          (log/trace ::deserialize {:parsed parsed
+                                    :result result})
+          (if-not (seq parsed)
+            result
+            (recur (rest source) (conj result parsed))))))
+
+    (defn parse-database [db]
+      (let [header @(ms/take! decoder-ring-magic-header)
+            buffer @(ms/take! decoder-ring-magic-header)
+            section-reader (gloss.io/lazy-decode-all section-selector buffer)
+            results        (deserialize section-reader)
+            results        (apply-f-to-key results :k binary-array->string)]
+        (pp/pprint results))))
+  (parse-database test-file)
+
+  
+  (def decoder-ring (gloss.io/decode-stream test-file section-selector))
+  (ms/take! decoder-ring)
+  (binary-array->string (byte-array [105 110 116 101 103 101 114 115 116 114 105 110 103]))
 
   (binary-array->string (byte-array [75
                                      0
@@ -792,5 +821,36 @@
   (binary-array->string (byte-array [114 97 99 101 58 102 114 97 110 99 101]))
 
   (-> listpack-bytes (get 3) count)
+
+
+
+                    ;;  :(parse-header-byte) 
+                    ;;  :redis-ver auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :redis-bits auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :ctime auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :used-mem auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :aof-base auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :dbselector selectdb
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :resizedb resizedb-info
+                    ;; :kv-pair-header kv-pair-header
+                    ;; :ziplist length-encoding
+                    ;; :key (parse-string)
+                    ;; :value (parse-string)
+                    ;; :next (expiry-or-value-type)
+                     ;; :key (parse-string)
+                    ;; :value (parse-string)
+                    ;; :next (expiry-or-value-type)
+                    ;; :key (parse-string)
+                    ;; :value (parse-string)
+                    ;; :intset kv-pair-header
+                    ;; :intset-value intset-encoding
+                    ;; :next (expiry-or-value-type)
+
 
   ::leave-this-here)

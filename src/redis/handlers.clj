@@ -12,6 +12,7 @@
               [redis.commands.echo]
               [redis.commands.error]
               [redis.commands.get]
+              [redis.commands.keys]
               [redis.commands.ping]
               [redis.commands.set]
               [redis.decoder :as decoder]
