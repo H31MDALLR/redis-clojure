@@ -103,20 +103,15 @@
       (if special
           ;; Special encoding
         (condp = special
-          0 (ordered-map :int-8bit :byte)
-          1 (ordered-map :int-16bit :int16-le)
-          2 (ordered-map :int-32bit :int32-le)
+          0 (compile-frame [:byte])
+          1 (compile-frame [:int16-le])
+          2 (compile-frame [:int32-le])
           3 (parse-lzf-string)
           (throw (Exception. (str "Unknown special encoding: " special))))
           ;; Regular string
         (compile-frame (repeat size :byte))))
     identity)))
 
-(defn binary-array->string
-  [arr]
-  (String. (byte-array arr)  java.nio.charset.StandardCharsets/UTF_8))
-
-(binary-array->string [98 105 107 101 58 49 58 115 116 97 116 115])
 
 #_(defcodec byte-codes
     (enum :ubyte {;; Opcodes
@@ -536,28 +531,13 @@
      (log/trace ::section-selector {:frame body})
      body)))
 
-
-(defcodec sections
-  (repeated section-selector :prefix :none :delimiters [-1]))
-
-(defcodec sections-debug
-  (repeated (header section-selector
-                    (fn [frame]
-                      (println ::sections-frame-parsed frame)
-                      frame)
-                    identity)
-            :delimiters [-1]))
-
-(defcodec rdb-file
-  [rdb-header sections])
-
-
-
-;; ------------------------------------------------------------------------------------------- REPL
-
+; ----------------------------------------------------------------------------------- REPL
 
 (comment
   (ns-unalias *ns* 'header)
+
+; --------------------------------------------------------- Parser Debugging
+
   (do
     (log/set-min-level! :trace)
 
@@ -568,6 +548,18 @@
               '[manifold.deferred :as d]
               '[manifold.stream :as ms])
 
+    
+    (defcodec sections
+      (repeated section-selector :prefix :none :delimiters [-1]))
+
+    (defcodec sections-debug
+      (repeated (header section-selector
+                        (fn [frame]
+                          (println ::sections-frame-parsed frame)
+                          frame)
+                        identity)
+                :delimiters [-1]))
+    
     (defn apply-f-to-key [m k f]
       (walk/postwalk
        (fn [x]
@@ -622,8 +614,34 @@
                       :padding :byte))
        identity))
 
-
-
+                    ;;  :(parse-header-byte)
+                    ;;  :redis-ver auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :redis-bits auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :ctime auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :used-mem auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :aof-base auxiliary-field
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :dbselector selectdb
+                    ;; :(parse-header-byte) (parse-header-byte)
+                    ;; :resizedb resizedb-info
+                    ;; :kv-pair-header kv-pair-header
+                    ;; :ziplist length-encoding
+                    ;; :key (parse-string)
+                    ;; :value (parse-string)
+                    ;; :next (expiry-or-value-type)
+                     ;; :key (parse-string)
+                    ;; :value (parse-string)
+                    ;; :next (expiry-or-value-type)
+                    ;; :key (parse-string)
+                    ;; :value (parse-string)
+                    ;; :intset kv-pair-header
+                    ;; :intset-value intset-encoding
+                    ;; :next (expiry-or-value-type)
+    
     (defcodec test [rdb-header
 
                     section-selector
@@ -648,7 +666,7 @@
                     section-selector
                     section-selector
                     ;sections
-
+                    
 
 
                     #_(repeated section-selector :prefix :none :delimiters [-1])])
@@ -665,136 +683,15 @@
         results (apply-f-to-key results :k binary-array->string)]
     (pp/pprint results))
 
-  (do
-    (require  '[clj-commons.byte-streams :as bs]
-              '[clojure.java.io :as io]
-              '[clojure.pprint :as pp]
-              '[clojure.walk :as walk]
-              '[manifold.deferred :as d]
-              '[manifold.stream :as ms])
-    
-    (def test-file (-> (io/resource "test/rdb/dump.rdb")
-                       io/input-stream
-                       (bs/convert (bs/stream-of bytes))
-                       #_bs/stream-of))
-    (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file rdb-header)) 
 
-    #_@(ms/take! section-reader)
-    (defn apply-f-to-key [m k f]
-      (walk/postwalk
-       (fn [x]
-         (if (and (map? x) (contains? x k))
-           (update x k f)
-           x))
-       m))
-    
-    (defn deserialize [source]
-      (loop [source source
-             result []]
-        (let [parsed (first source)]
-          (log/trace ::deserialize {:parsed parsed
-                                    :result result})
-          (if-not (seq parsed)
-            result
-            (recur (rest source) (conj result parsed))))))
-
-    (defn parse-database [db]
-      (let [header @(ms/take! decoder-ring-magic-header)
-            buffer @(ms/take! decoder-ring-magic-header)
-            section-reader (gloss.io/lazy-decode-all section-selector buffer)
-            results        (deserialize section-reader)
-            results        (apply-f-to-key results :k binary-array->string)]
-        (pp/pprint results))))
-  (parse-database test-file)
-
-  
-  (def decoder-ring (gloss.io/decode-stream test-file section-selector))
-  (ms/take! decoder-ring)
-  (binary-array->string (byte-array [105 110 116 101 103 101 114 115 116 114 105 110 103]))
-
-  (binary-array->string (byte-array [75
-                                     0
-                                     0
-                                     0
-                                     10
-                                     0
-                                     -123
-                                     98
-                                     114
-                                     97
-                                     110
-                                     100
-                                     6
-                                     -121
-                                     80
-                                     111
-                                     114
-                                     115
-                                     99
-                                     104
-                                     101
-                                     8
-                                     -124
-                                     116
-                                     114
-                                     105
-                                     109
-                                     5
-                                     -125
-                                     71
-                                     84
-                                     83
-                                     4
-                                     -124
-                                     121
-                                     101
-                                     97
-                                     114
-                                     5
-                                     -57
-                                     -29
-                                     2
-                                     -122
-                                     101
-                                     110
-                                     103
-                                     105
-                                     110
-                                     101
-                                     7
-                                     -113
-                                     50
-                                     46
-                                     52
-                                     76
-                                     32
-                                     84
-                                     117
-                                     114
-                                     98
-                                     111
-                                     32
-                                     52
-                                     99
-                                     121
-                                     108
-                                     16
-                                     -126
-                                     104
-                                     112
-                                     3
-                                     -63
-                                     109
-                                     2
-                                     -1]))
 
 ;; 68 70 63 C1 6D 02 FF 15 0B 72 61 63 65 3A 66 72
 ;; 61 6E 63 65 01 10 00 00 01 93 6F 51 8E 74 00 00
 ;; 00 00 00 00 C3 40 84 40 89 1F 89 00 00 00 00 00
-;; 20 00 03 01 00 01 04 01 85 72 69 64 65 72 06 85 
-;; 73 70 65 65 64 06 88 70 6F 73 69 74 08 69 6F 6E 
+;; 20 00 03 01 00 01 04 01 85 72 69 64 65 72 06 85
+;; 73 70 65 65 64 06 88 70 6F 73 69 74 08 69 6F 6E
 ;; 09 8B 6C 6F 63 61 40 09 06 5F 69 64 0C 00 01 02
-;; 20 2c 12 00 01 88 43 61 73 74 69 6C 6C 61 09 84 
+;; 20 2c 12 00 01 88 43 61 73 74 69 6C 6C 61 09 84
 ;; 33 30 2E 32 05 00 01 20 00 00 07 1b 13 F1 63 1C
 ;; 03 00 01 85 4e 6f 72 65 6D 06 84 32 38 2E 38 05
 ;; 03 C0 1A 01 8C 34 20 1A 10 88 50 72 69 63 6B 65
@@ -823,34 +720,6 @@
   (-> listpack-bytes (get 3) count)
 
 
-
-                    ;;  :(parse-header-byte) 
-                    ;;  :redis-ver auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :redis-bits auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :ctime auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :used-mem auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :aof-base auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :dbselector selectdb
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :resizedb resizedb-info
-                    ;; :kv-pair-header kv-pair-header
-                    ;; :ziplist length-encoding
-                    ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :next (expiry-or-value-type)
-                     ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :next (expiry-or-value-type)
-                    ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :intset kv-pair-header
-                    ;; :intset-value intset-encoding
-                    ;; :next (expiry-or-value-type)
 
 
   ::leave-this-here)

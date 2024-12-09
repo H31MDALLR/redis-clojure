@@ -8,38 +8,52 @@
    [redis.utils :refer [keywordize]]
    [taoensso.timbre :as log]))
 
-;; ------------------------------------------------------------------------------------------- Layer 0
+
+;; ---------------------------------------------------------------------------- Layer 0
+;; depends on nothing in this file
+(def ^:private docs
+  (->  (io/resource "docs.edn")
+       slurp
+       edn/read-string))
+
+;; ---------------------------------------------------------------------------- Layer 1
+;; depends only on layer 0
+(defn all-docs []
+  (-> docs
+      vals
+      flatten
+      merge
+      vec))
+
+(defn subcommand-docs [subcommand]
+  (get docs (keywordize subcommand)))
+
 ;; -------------------------------------------------------- Command Handling
 
-(defmulti exec-command (fn [args] (-> args first str/lower-case keyword)))
-(defmethod exec-command :docs [[_ subcommand]]
-  (let [docs (->  (io/resource "docs.edn")
-                  slurp
-                  edn/read-string)]
-    (if subcommand 
-      (let [docs (->  (io/resource "docs.edn")
-                      slurp
-                      edn/read-string
-                      (get (keywordize subcommand)))]
-        (resp2/encode-resp {:array docs}))
-      
-      ;; all docs
-      (let [alldocs (-> docs
-                        vals
-                        flatten
-                        merge
-                        vec)]
-        (resp2/encode-resp {:array alldocs})))))
+(defmulti exec-command (fn [ctx] (-> ctx 
+                                     :command 
+                                     :subcommand)))
 
-;; ------------------------------------------------------------------------------------------- Layer 1
+(defmethod exec-command :docs [{:keys [command]
+                                :as   ctx}]
+  (let [{:keys [subcommand]} command
+        response             (if subcommand 
+                               (subcommand-docs subcommand) 
+                               (all-docs))
+        encoded-resp         (resp2/encode-resp {:array response})]
+    (assoc ctx :response encoded-resp)))
+
+;; ---------------------------------------------------------------------------- Layer 1
+;; depends only on layer 1
+
 ;; -------------------------------------------------------- Dispatch
 (defmethod dispatch/command-dispatch :command
-  [{:keys [args]}]
-  (log/info ::command-dispatch :command {:args args})
-  (exec-command args))
+  [ctx]
+  (log/info ::command-dispatch :command ctx)
+  (exec-command ctx))
 
 
-;; ------------------------------------------------------------------------------------------- REPL AREA
+;; ---------------------------------------------------------------------------- REPL AREA
 (comment
 
   (let [docs (->  (io/resource "docs.edn")

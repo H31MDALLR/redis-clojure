@@ -3,20 +3,24 @@
    [redis.time :as time]
    [taoensso.timbre :as log]))
 
-
 (def backing-store (atom {}))
 
-(defn retrieve [k]
-  (let [{:keys [value expiry] :as data} (get @backing-store k)]
+(defn add-db [db-id db]
+  (swap! backing-store assoc db-id db))
+
+(defn get-aux-values [db-id & k])
+
+(defn retrieve [db k]
+  (let [{:keys [value expiry] :as data} (get-in @backing-store [db :database k])]
     (log/trace ::retrieve {:k k
-                             :v value})
-    (when (seq value) (swap! backing-store 
-                             assoc 
-                             k 
+                           :v value})
+    (when (seq value) (swap! backing-store
+                             assoc
+                             k
                              (time/update-last-read-access data)))
 
     (if (and expiry (time/expired? expiry))
-      (do 
+      (do
         (log/trace ::retrieve {:expired? true
                                :k k
                                :v value})
@@ -24,10 +28,13 @@
         nil)
       value)))
 
-(defn store [k v]
-  (log/trace ::store {:k k 
+(defn store [db k v]
+  (log/trace ::store {:k k
                       :v v})
-  (swap! backing-store assoc k (time/update-last-write-access v)))
+  (swap! backing-store 
+         assoc-in 
+         [db :database k] 
+         (time/update-last-write-access v)))
 
 (comment
 

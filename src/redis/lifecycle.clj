@@ -4,8 +4,10 @@
    [integrant.core :as ig]
    [redis.config :as config]
    [redis.handlers :as handlers]
+   [redis.rdb.deserialize :as deserialize]
    [redis.runtime :as runtime]
-   [taoensso.timbre :as log])
+   [taoensso.timbre :as log]
+   [redis.storage :as storage])
   (:import
    [org.apache.commons.lang3.exception ExceptionUtils]))
 
@@ -49,11 +51,20 @@
 (defmethod ig/init-key :redis/config [_ opts]
   (log/trace ::init-key :redis/config opts)
   (let [service-config (-> @cli-opts :options)
-        config-db (merge opts service-config)]
-    (log/trace ::init-key :redis/config {:opts opts
+        config-db      (merge opts service-config)]
+    (log/trace ::init-key :redis/config {:opts       opts
                                          :cli-config service-config})
     (doseq [kv config-db]
       (config/write [:redis/config (key kv)] (val kv)))
+    
+    (if (seq service-config)
+      (let [{:keys [dir dbfilename]} service-config
+            path (str dir "\\" dbfilename)
+            database       (deserialize/rdb-file->database path)]
+        (storage/add-db (:id database) database))
+      
+      ;; create an empty database at id 0 if no config passed.
+      (storage/add-db 0 (deserialize/empty-db 0)))
     
     config-db))
 

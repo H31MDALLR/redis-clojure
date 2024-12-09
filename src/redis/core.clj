@@ -6,6 +6,7 @@
    [taoensso.timbre :as log]))
 
 ;; ---------------------------------------------------------------------------- CLI options
+;; TBD: add validation that these are valid paths.
 (def cli-options
   [["-dir" "--dir DIRECTORY" "Directory path where the RDB database is stored"
     :validate [string?]]

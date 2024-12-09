@@ -9,11 +9,16 @@
 ;; ------------------------------------------------------------------------------------------- Layer 1
 ;; -------------------------------------------------------- Decode Interface
 
-(defmulti decode (fn [coll] (-> coll first keywordize)))
+(defmulti decode (fn [ctx] (-> ctx :parse-result first keywordize)))
+
 (defmethod decode :command
-  [[command & args]]
-  {:command (keywordize command)
-   :args args})
+  [{:keys [parse-result]
+    :as   ctx}]
+  (let [[command & args] parse-result
+        cmd-map          {:command    (keywordize command)
+                          :subcommand (-> args first keywordize)
+                          :args       (rest args)}]
+    (assoc ctx :command cmd-map)))
 
 ;; special
 (defmethod decode :config

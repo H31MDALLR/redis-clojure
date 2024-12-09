@@ -1,34 +1,34 @@
 (ns redis.handlers
-  (:require   [aleph.tcp :as tcp]
-              [gloss.core :as gloss]
-              [gloss.io :as io]
-              [manifold.deferred :as d]
-              [manifold.stream :as s]
-              [taoensso.timbre :as log]
-
-              [redis.commands.dispatch :as dispatch]
-              [redis.commands.command]
-              [redis.commands.config]
-              [redis.commands.echo]
-              [redis.commands.error]
-              [redis.commands.get]
-              [redis.commands.keys]
-              [redis.commands.ping]
-              [redis.commands.set]
-              [redis.decoder :as decoder]
-              [redis.parsing.resp2 :as parser]
-              [redis.encoding.resp2 :as resp2]))
+  (:require
+   [gloss.core :as gloss]
+   [gloss.io :as io]
+   [manifold.deferred :as d]
+   [manifold.stream :as s]
+   [redis.commands.command]
+   [redis.commands.config]
+   [redis.commands.dispatch :as dispatch]
+   [redis.commands.echo]
+   [redis.commands.error]
+   [redis.commands.get]
+   [redis.commands.keys]
+   [redis.commands.ping]
+   [redis.commands.set]
+   [redis.decoder :as decoder]
+   [redis.encoding.resp2 :as resp2]
+   [redis.parsing.resp2 :as parser]
+   [redis.session :as session]
+   [taoensso.timbre :as log]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
 (log/set-min-level! :trace)
 (defn handler
-  [msg]
-  (log/info ::handler {:args msg})
+  [{:keys [message] :as ctx}]
+  (log/info ::handler ctx)
 
-  (->> msg
-       parser/parse-resp
-       decoder/decode
-       dispatch/command-dispatch))
+  (let [parse-result (parser/parse-resp message)]
+    (->> (assoc ctx :parse-result parse-result)
+         decoder/decode
+         dispatch/command-dispatch)))
 
 ;; ------------------------------------------------------------------------------------------- Handler
 
@@ -74,26 +74,34 @@
 
 ;; ------------------------------------------------------------------------------------------- Exposed Handlers
 
-(defn handle-message [message socket]
+(defn handle-message [context]
   (try
-    (let [response (handler message)]
+    (let [{:keys [response]} (handler context)]
       (log/info "Sending response:" response)
-      (s/put! socket response))
+      (s/put! (:socket context) response))
     (catch Exception e
       (log/error e "Error handling message"))))
 
 (defn handle-connection [socket info]
   (log/info "New connection from:" info)
-  (s/consume
-   (fn [raw-message]
-     (try
-       (let [message (String. raw-message "UTF-8")] ;; Decode incoming bytes
-         (log/info "Received message:" message)
-         (handle-message message socket))
-       (catch Exception e
-         (log/error e "Error decoding message" e)
-         (s/close! socket)))) ;; Close on error
-   socket))
+  (let [session-id (session/create-session)
+        context    {:connection-info info
+                    :session-id      session-id
+                    :socket          socket}]
+    (s/consume
+     (fn [raw-message]
+       (try
+         (let [message (String. raw-message "UTF-8")
+               context (assoc context :message message)] ;; Decode incoming bytes
+           (log/info "Received message:" message)
+           (handle-message context))
+         (catch Exception e
+           (log/error e "Error decoding message" e)
+           (s/close! socket)))) ;; Close on error
+     socket)
+    
+    ;; for now, per connection ephermeral sessions
+    (session/expire-session session-id)))
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 
