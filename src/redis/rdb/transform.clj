@@ -125,13 +125,13 @@
 (defmethod transform :aux [{:keys [type k v]}]
   {:aux 
    {k {:type type
-       :v (parse-value :aux v)}}})
+       :value (parse-value :aux v)}}})
 
 (defmethod transform :key-value [{:keys [expiry kind k v]}]
   {:database
    {k {:expiry expiry
        :kind kind
-       :v (parse-value kind v)}}})
+       :value (parse-value kind v)}}})
 
 (defmethod transform :resizdb-info [info]
   {:resizdb-info 

@@ -30,18 +30,22 @@
 
 ;; -------------------------------------------------------- Command Handling
 
-(defmulti exec-command (fn [ctx] (-> ctx 
-                                     :command 
-                                     :subcommand)))
+(defmulti exec-command #(-> % :command-info :subcommand))
 
-(defmethod exec-command :docs [{:keys [command]
+(defmethod exec-command :docs [{:keys [args]
                                 :as   ctx}]
-  (let [{:keys [subcommand]} command
-        response             (if subcommand 
-                               (subcommand-docs subcommand) 
-                               (all-docs))
-        encoded-resp         (resp2/encode-resp {:array response})]
+  (let [response     (if (seq args) 
+                       (select-keys docs args) 
+                       (all-docs))
+        encoded-resp (resp2/encode-resp {:array response})]
     (assoc ctx :response encoded-resp)))
+
+(defmethod exec-command :default [{:keys [command-info] :as ctx}]
+  (let [subcommand (:subcommand command-info)]
+    (log/error ::exec-command {:anomaly :anomalies/not-found
+                               :subcommand subcommand
+                               :command-info command-info})
+    (assoc ctx :response (resp2/error (str "Unknown option given: " subcommand)))))
 
 ;; ---------------------------------------------------------------------------- Layer 1
 ;; depends only on layer 1
@@ -55,7 +59,9 @@
 
 ;; ---------------------------------------------------------------------------- REPL AREA
 (comment
-
+(def exec-command nil)
+(ns-unalias *ns* 'command-dispatch)
+  
   (let [docs (->  (io/resource "docs.edn")
                   slurp
                   edn/read-string

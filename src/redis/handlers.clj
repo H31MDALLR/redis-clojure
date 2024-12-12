@@ -22,13 +22,12 @@
 ;; ------------------------------------------------------------------------------------------- Defs
 (log/set-min-level! :trace)
 (defn handler
-  [{:keys [message] :as ctx}]
+  [ctx]
   (log/info ::handler ctx)
-
-  (let [parse-result (parser/parse-resp message)]
-    (->> (assoc ctx :parse-result parse-result)
-         decoder/decode
-         dispatch/command-dispatch)))
+  (->> ctx
+       parser/parse-resp
+       decoder/decode
+       dispatch/command-dispatch))
 
 ;; ------------------------------------------------------------------------------------------- Handler
 
@@ -84,7 +83,7 @@
 
 (defn handle-connection [socket info]
   (log/info "New connection from:" info)
-  (let [session-id (session/create-session)
+  (let [session-id (session/get-or-create-session (hash info))
         context    {:connection-info info
                     :session-id      session-id
                     :socket          socket}]
@@ -98,10 +97,7 @@
          (catch Exception e
            (log/error e "Error decoding message" e)
            (s/close! socket)))) ;; Close on error
-     socket)
-    
-    ;; for now, per connection ephermeral sessions
-    (session/expire-session session-id)))
+     socket)))
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 
@@ -115,6 +111,13 @@
     (def ping-command "*1\r\n$4\r\nPING\r\n")
     (def echo-command "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n"))
 
+  
+   (let [info {:remote-addr "127.0.0.1", :ssl-session nil, :server-port 6379, :server-name "localhost"}
+         fingerprint (hash info)
+         context    {:message get-command
+                    :session-id      (session/get-or-create-session fingerprint)}]
+     (handler context))
+     
   (ns-unalias *ns* 'encoder)
   (handler echo-command)
   (handler docs-command)

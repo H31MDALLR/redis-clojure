@@ -5,7 +5,8 @@
    [redis.commands.dispatch :as dispatch]
    [redis.encoding.resp2 :as resp2]
    [redis.storage :as storage]
-   [redis.time :as time]))
+   [redis.time :as time]
+   [redis.session :as session]))
 
 ;; ------------------------------------------------------------------------------------------- Data
 
@@ -27,9 +28,9 @@
       (do (log/error "Mutually exlusive expiration options made it through parsing!" (filter some? expiry-keys))
           (resp2/error (str "Expiration options are mutually exclusive, given: " (filter some? expiry-keys)))))))
 
-(defn- store-and-get [k value nx xx]
-  (let [get-result          (storage/retrieve k)]
-    (storage/store k value)
+(defn- store-and-get [db k value nx xx]
+  (let [get-result          (storage/retrieve db k)]
+    (storage/store db k value)
     (cond
       (and nx (empty? get-result)) (resp2/bulk-string get-result)
       (and nx (seq get-result)) (resp2/bulk-string nil)
@@ -40,13 +41,16 @@
 ;; ------------------------------------------------------------------------------------------- Dispatch
 
 (defmethod dispatch/command-dispatch :set
-  [{:keys [defaults options]}]
-  (let [[k v]               defaults
-        {:keys [get nx xx]} options 
+  [{:keys [command-info session-id]
+    :as   ctx}]
+  (let [{:keys [defaults options]} command-info
+        [k v]                      defaults
+        {:keys [get nx xx]}        options 
+        db                         (session/get-item session-id [:db])
 
         ;; grab it before write ops if needed
-        get-result          (when get (resp2/bulk-string (storage/retrieve k)))
-        option-errors       (mutually-exclusive-options nx xx options)]
+        get-result                 (when get (resp2/bulk-string (storage/retrieve db k)))
+        option-errors              (mutually-exclusive-options nx xx options)]
     (log/trace ::dispatch :set {:defaults defaults
                                 :options  options})
 
@@ -56,17 +60,18 @@
       ;; Expiration, NX and XX options parsing 
       (let [expiry         (time/map->map-with-expiry v options)
             value          (into {:value v} expiry)
+            db             (session/get-item session-id [:db])
             encoded-result (if (or nx xx) 
-                             (store-and-get k value nx xx)
-                             (do (storage/store k value)
+                             (store-and-get db k value nx xx)
+                             (do (storage/store db k value)
                                  (resp2/ok)))]
         
         (log/trace ::set {:encoded-result encoded-result})
         
         ;; GET option
         (if get 
-          get-result
-          encoded-result)))))
+          (assoc ctx :response get-result)
+          (assoc ctx :response encoded-result))))))
 
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA

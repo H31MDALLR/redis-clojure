@@ -96,10 +96,10 @@
      defaults-count - number of default arguments
    Output:
      A map with formatted defaults and options."
-  [[command & args] defaults-count]
-  (log/trace ::parse-result->command {:command command
-                                      :args args})
-  (let [[defaults options] (split-at defaults-count args) ; Separate defaults and options
+  [{:keys [parse-result] :as ctx} defaults-count]
+  (log/trace ::parse-result->command {:transforming parse-result})
+  (let [[command & args] parse-result
+        [defaults options] (split-at defaults-count args) ; Separate defaults and options
         rules              (get ruleset (keywordize command))
         parsed             (find-matching-rules rules options)]
 
@@ -109,9 +109,11 @@
     (let [options (parse-data->options parsed)]
 
       ;; Return final structured result
-      {:command  (keywordize command)
-       :defaults (vec defaults) ; Convert defaults to vector
-       :options  options})))
+      (assoc ctx 
+             :command-info 
+             {:command  (keywordize command)
+              :defaults (vec defaults) ; Convert defaults to vector
+              :options  options}))))
 
 
 
@@ -131,7 +133,7 @@
                       [2 '("SET" "grape" "apple" "px" "100")]]]
         (map (fn [sample]
                (let [[defaults example] sample] 
-                 (parse-result->command example defaults)))
+                 (parse-result->command {:parse-result example} defaults)))
              examples))
       (catch clojure.lang.ExceptionInfo e
         (ex-data e))))

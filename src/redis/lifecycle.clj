@@ -25,7 +25,7 @@
      {:port port})))
 
 (defmethod ig/halt-key! :adapter/aleph [_ server]
-  (log/info ::aleph :stopping)
+  (log/info ::aleph :stopping) 
   (.close server))
 
 ;; -------------------------------------------------------- Environment (prod, nonprod, etc.)
@@ -57,9 +57,9 @@
     (doseq [kv config-db]
       (config/write [:redis/config (key kv)] (val kv)))
     
-    (if (seq service-config)
-      (let [{:keys [dir dbfilename]} service-config
-            path (str dir "\\" dbfilename)
+    (if (seq config-db)
+      (let [{:keys [dir dbfilename]} config-db
+            path (str dir "/" dbfilename)
             database       (deserialize/rdb-file->database path)]
         (storage/add-db (:id database) database))
       
@@ -111,6 +111,8 @@
   (defn halt []
     (ig/halt! @system)
     (reset! system nil))
+  
+  (str (config/get-value [:redis/config :dir]) "/" (config/get-value [:redis/config :dbfilename]))
 
   (restart system)
   "Leave this here.")

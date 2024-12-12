@@ -46,13 +46,20 @@
     (config/write [:redis/config (keywordize k)] v))
   (resp2/ok))
 
+(defmethod exec-command :default [subcommand options]
+  (log/error ::exec-command {:anomaly :anomalies/not-found
+                             :subcommand subcommand
+                             :options options})
+  (resp2/error (str "Unknown option given: " subcommand)))
+
 ;; ------------------------------------------------------------------------------------------- Layer 1
 ;; -------------------------------------------------------- Dispatch
 (defmethod dispatch/command-dispatch :config
-  [{:keys [subcommand options]}] 
-  (log/info ::command-dispatch :config {:subcommand subcommand
-                                        :options    options})
-  (exec-command (keywordize subcommand) options))
+  [{:keys [command-info] :as ctx}] 
+  (let [{:keys [subcommand options]} command-info]
+    (log/info ::command-dispatch :config {:subcommand subcommand
+                                          :options    options})
+    (assoc ctx :response (exec-command (keywordize subcommand) options))))
 
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA

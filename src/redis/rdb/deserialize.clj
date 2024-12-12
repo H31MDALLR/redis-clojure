@@ -43,7 +43,6 @@
 (defn load-rdb-file
   [path]
   (-> path
-      io/resource
       io/input-stream
       (bs/convert (bs/stream-of bytes))))
 
@@ -114,8 +113,10 @@
 ; ----------------------------------------------------------------------------- REPL
 
 (comment
-  (-> "test/rdb/dump.rdb"
+  (-> "resources/test/rdb/dump.rdb"
       parse-rdb-file
       second
       transform/transform-data)
-  (rdb-file->database "test/rdb/dump.rdb"))
+  (rdb-file->database "resources/test/rdb/dump.rdb")
+  
+  ::leave-this-here)

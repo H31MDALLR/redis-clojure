@@ -4,5 +4,5 @@
                  :config #ig/ref :redis/config} 
  :env/environment {:env #or [#env ENVIRONMENT "localhost"]}
  :handler/handle-connection {}
- :redis/config {:dir  "/tmp/redis-data" 
+ :redis/config {:dir  "resources/test/rdb" 
                 :dbfilename "redis.rdb"}}

@@ -1,31 +1,62 @@
 (ns redis.session 
   (:require
+   [clojure.string :as str]
+   
+   [taoensso.timbre :as log]
+
    [redis.time :as time]
-   [redis.session :as session]
-   [clojure.string :as str]))
+   [redis.session :as session]))
 
 ;; ---------------------------------------------------------------------------- Layer 0
 ;; depends only on things outside this file
 
 ;; -------------------------------------------------------- defs
 (def sessions (atom {}))
+(def fingerprint-session-map (atom {}))
+
+;; default of 24 hours for now.
+(def expiry-default 86400)
+
+(defn should-expire? [session-id]
+  (let [last-write (-> @sessions session-id :last-write-time)]
+    ()))
+
+(defn create-session [fingerprint]
+  (let [id (-> (java.util.UUID/randomUUID)
+                   .toString
+                   keyword)
+            expiry (time/set-expiry-time {:seconds [expiry-default]})
+            session (merge {:fingerprint fingerprint 
+                            :db 0}
+                           expiry)]
+        (swap! fingerprint-session-map assoc fingerprint id)
+        (swap! sessions assoc-in [id] session)
+        (log/trace ::create-session {:created id})
+        id))
 
 ;; ---------------------------------------------------------------------------- Layer 1
 ;; depends only on layer 1
 
 ;; -------------------------------------------------------- CRUD for sessions
 
-(defn create-session
-  []
-  (let [id (-> (java.util.UUID/randomUUID)
-               .toString
-               keyword)
-        session {:db 0}]
-    (swap! sessions assoc-in [:sessions id] (time/update-last-write-access session))
-    id))
-
 (defn expire-session [id]
-  (swap! sessions dissoc id))
+  (log/trace ::expire-session id)
+  (let [fingerprint (:id @sessions)]
+    (swap! sessions dissoc id)
+    (swap! fingerprint-session-map dissoc fingerprint)))
+
+(defn get-or-create-session
+  [fingerprint]
+  (log/trace ::create-session :enter)
+  (let [extant-session (get @fingerprint-session-map fingerprint)]
+    (if extant-session
+      (if (time/expired? (-> @sessions extant-session :expiry))
+        (do 
+          (log/trace ::get-or-create-session {:renewing extant-session})
+          (expire-session extant-session)
+          (create-session fingerprint))
+        extant-session)
+      (create-session fingerprint))))
 
 ;; --------------------------------------------------------ßCRUD on items
 
@@ -57,6 +88,10 @@
 ;; ---------------------------------------------------------------------------- REPL AREA
 
 (comment
+
+  (def test-session (get-or-create-session (hash {:remote-addr "127.0.0.1", :ssl-session nil, :server-port 6379, :server-name "localhost"})))
+  (-> @sessions test-session :expiry :expiry)
+
   (add-item :1234 [:test :path :to :a :key] "updated-value")
   (add-item :4444 [:test :path :to :a :key] "different-value")
   (delete-item :4444 [:test :path :to :a])
@@ -73,4 +108,5 @@
       .toString
       keyword)
   (into {} [{:a "test"} {:a "next"}])
-  "Leave this here.")
+  "Leave this here."
+  )

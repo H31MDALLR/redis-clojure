@@ -27,14 +27,14 @@
 ;; Parse a RESP input
 
 (defn parse-resp 
-  [input]
-  (log/trace ::parse-resp (pr-str input))
-  (let [result (resp-parser input)]
+  [{:keys [message] :as ctx}]
+  (log/trace ::parse-resp (pr-str message))
+  (let [result (resp-parser message)]
     (if (insta/failure? result)
       (do
         (log/error ::parse-resp (ex-info "Parsing failed" {:error (insta/get-failure result)}))
-        ["ERROR" (str "Error parsing command: " input)])
-      result)))
+        (assoc ctx :response ["ERROR" (str "Error parsing command: " message)]))
+      (assoc ctx :parse-result result))))
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 
@@ -54,7 +54,7 @@
                   "*2\r\n$3\r\nGET\r\n$5\r\napple\r\n"
                   "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n"]]
     (for [example examples]
-      (parse-resp example)))
+      (parse-resp {:message example})))
 
   (do
     ;; Example RESP inputs
@@ -73,31 +73,40 @@
     
     (def px-error "*5\r\n$3\r\nSET\r\n$6\r\norange\r\n$4\r\npear\r\n$2\r\npx\r\n$3\r\n100\r\n"))
 
+  (let [examples [docs-command
+                  get-command
+                  ping-command
+                  set-command]]
+    (for [cmd examples]
+      (-> {:message cmd}
+          parse-resp
+          :parse-result)))
+  
 ;; Parse them
-  (parse-resp px-error)
-  (parse-resp set-command)
-  (parse-resp docs-command)
+  (parse-resp {:message px-error})
+  (parse-resp {:message set-command})
+  (parse-resp {:message docs-command})
+  (parse-resp {:message ping-command})
 
-  (parse-resp simple-string)
+  (parse-resp {:message simple-string})
 ;; => [:SimpleString "OK"]
-
-  (parse-resp error)
+  
+  (parse-resp {:message error})
 ;; => [:Error "ERR unknown command"]
-
-  (parse-resp integer)
+  
+  (parse-resp {:message integer})
 ;; => [:Integer "1000"]
-
-  (parse-resp bulk-string)
+  
+  (parse-resp {:message bulk-string})
 ;; => [:BulkString "foobar"]
+  
+  (parse-resp {:message ping-command})
 
-  (parse-resp ping-command)
-
-  (parse-resp null-bulk-string)
+  (parse-resp {:message null-bulk-string})
 ;; => [:BulkString :NULL]
-
-  (parse-resp ping-command)
-  (parse-resp get-command)
-
-  (parse-resp array)
+  
+  (parse-resp {:message get-command})
+  
+  (parse-resp {:message array})
 ;; => [:Array [:SimpleString "OK"] [:Error "ERR unknown command"]]
   )
