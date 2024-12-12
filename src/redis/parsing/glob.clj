@@ -135,18 +135,21 @@ printable = #\"[ -~&&[^,]]\"
          (insta/transform {:segment identity})
          convert)))
 
-(defn glob-matches? [regex-str key]
-  (log/trace ::glob-matches? {:regex regex-str
-                              :key key})
+(defn glob-matches? 
+  [regex-str key] 
   (let [regex (re-pattern regex-str)]
     (if (string? key)
       (re-matches regex key)
       (do
-        (log/error ::glob-matches? {:anomaly :anomalies/incorrect :regex regex-str :key key})
+        (log/error ::glob-matches? {:anomaly :anomalies/incorrect
+                                    :regex   regex-str
+                                    :key     key})
         nil))))
 
+
 (defn match-keys [glob-pattern keys]
-  (log/trace ::match-keys :enter)
+  (log/trace ::match-keys {:glob-patter glob-pattern
+                           :keys keys})
   (let [regex-str  (-> glob-pattern glob-grammar to-regex-transform)]
     (log/trace ::match-keys {:keys keys
                              :regex regex-str})

@@ -112,6 +112,8 @@
     (ig/halt! @system)
     (reset! system nil))
   
+  (storage/find-keys "*")
+  
   (str (config/get-value [:redis/config :dir]) "/" (config/get-value [:redis/config :dbfilename]))
 
   (restart system)

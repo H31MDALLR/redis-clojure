@@ -107,14 +107,16 @@
 
     (def set-command "*7\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$4\r\ntest\r\n$2\r\nPX\r\n$2\r\nNX\r\n$7\r\nKEEPTTL\r\n$3\r\nGET\r\n")
     (def docs-command "*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n")
-    (def get-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$6\r\nHello!\r\n")
+
+    (def set-banana "*5\r\n$3\r\nSET\r\n$6\r\nbanana\r\n$5\r\napple\r\n$2\r\npx\r\n$3\r\n100\r\n")
+    (def get-banana  "*2\r\n$3\r\nGET\r\n$6\r\nbanana\r\n")
     (def ping-command "*1\r\n$4\r\nPING\r\n")
     (def echo-command "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n"))
 
   
    (let [info {:remote-addr "127.0.0.1", :ssl-session nil, :server-port 6379, :server-name "localhost"}
          fingerprint (hash info)
-         context    {:message get-command
+         context    {:message get-banana
                     :session-id      (session/get-or-create-session fingerprint)}]
      (handler context))
      
@@ -122,7 +124,7 @@
   (handler echo-command)
   (handler docs-command)
   (handler ping-command)
-  (handler get-command)
+  (handler set-banana)
   (-> set-command parser/parse-resp decoder/decode)
 
   (let [[one two] '("test" "stuff")]

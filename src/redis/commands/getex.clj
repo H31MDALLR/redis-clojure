@@ -1,12 +1,20 @@
 (ns redis.commands.getex
-    (:require
-    [redis.commands.dispatch :as dispatch]
-    [redis.encoding.resp2 :as resp2]
-    [redis.storage :as storage]))
+  (:require
+   [redis.commands.dispatch :as dispatch]
+   [redis.encoding.resp2 :as resp2]
+   [redis.session :as session]
+   [redis.storage :as storage]
+   [taoensso.timbre :as log]))
 
-
-  (defmethod dispatch/command-dispatch :get
-    [{:keys [k]}]
-    (let [v (get @storage/store k)]
-      (resp2/bulk-string v)))
+;; TBD - support the  -EX part of the command
+(defmethod dispatch/command-dispatch :get
+  [{:keys [command-info session-id] :as ctx}]
+  (let [{:keys [defaults options]} command-info
+        db (session/get-item session-id [:db])
+        _ (log/trace ::command-dispatch :getex {:db db
+                                                :defaults defaults
+                                                :options options})
+        v (storage/retrieve db (first defaults))]
+    (log/trace ::command-dispatch :get {:value v})
+    (assoc ctx :response (resp2/bulk-string v))))
 

@@ -11,7 +11,7 @@
    [redis.parsing.options :as options]
    [redis.config :as config]))
 
-;; ------------------------------------------------------------------------------------------- Layer 0
+;; ---------------------------------------------------------------------------- Layer 0
 
 
 ;; -------------------------------------------------------- Command Handling
@@ -62,7 +62,7 @@
     (assoc ctx :response (exec-command (keywordize subcommand) options))))
 
 
-;; ------------------------------------------------------------------------------------------- REPL AREA
+;; ----------------------------------------------------------------------------REPL AREA
 (comment 
   (ns-unalias *ns* 'exec-command)
   (-> :redis/config config/get-value (get (keyword "maxA")))
