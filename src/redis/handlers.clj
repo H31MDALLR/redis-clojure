@@ -4,6 +4,8 @@
    [gloss.io :as io]
    [manifold.deferred :as d]
    [manifold.stream :as s]
+   [taoensso.timbre :as log]
+   
    [redis.commands.command]
    [redis.commands.config]
    [redis.commands.dispatch :as dispatch]
@@ -16,8 +18,7 @@
    [redis.decoder :as decoder]
    [redis.encoding.resp2 :as resp2]
    [redis.parsing.resp2 :as parser]
-   [redis.session :as session]
-   [taoensso.timbre :as log]))
+   [redis.session :as session]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
 (log/set-min-level! :trace)

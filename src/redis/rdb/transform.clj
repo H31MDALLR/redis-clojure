@@ -1,5 +1,5 @@
 (ns redis.rdb.transform
-   (:require [clojure.zip :as zip]
+   (:require [java-time.api :as jt]
              [taoensso.timbre :as log]))
 
 ; ----------------------------------------------------------------------------- Defs
@@ -18,6 +18,14 @@
   (if (> (count v) 1)
     (bytes->string v)
     (get v 0)))
+
+(defmethod parse-value :RDB_OPCODE_EXPIRETIME
+  [_ v]
+  (when (number? v) (jt/instant v)))
+
+(defmethod parse-value :RDB_OPCODE_EXPIRETIME_MS
+  [_ v]
+  (when (number? v) (jt/instant v)))
 
 (defmethod parse-value :RDB_TYPE_STRING
   [_ v]
@@ -119,6 +127,11 @@
   [_ v]
   v)
 
+(defmethod parse-value :default
+  [_ _] 
+  (log/warn ::parse-value :default {:anomaly :anomalies/incorrect})
+  nil)
+
 ; ----------------------------------------------------------------------------- Transform Interface
 
 (defmulti transform :type)
@@ -128,6 +141,10 @@
        :value (parse-value :aux v)}}})
 
 (defmethod transform :key-value [{:keys [expiry kind k v]}]
+  (let [{:keys [kind timestamp]} expiry
+        expiry (if (every? some? [kind timestamp]) 
+                 (parse-value kind timestamp) 
+                   nil)])
   {:database
    {k {:expiry expiry
        :kind kind

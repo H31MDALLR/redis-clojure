@@ -2,11 +2,12 @@
   (:require
    [clojure.edn :as edn]
    [clojure.java.io :as io]
-   [clojure.string :as str]
+
+   [taoensso.timbre :as log]
+
    [redis.commands.dispatch :as dispatch]
    [redis.encoding.resp2 :as resp2]
-   [redis.utils :refer [keywordize]]
-   [taoensso.timbre :as log]))
+   [redis.utils :refer [keywordize]]))
 
 
 ;; ---------------------------------------------------------------------------- Layer 0

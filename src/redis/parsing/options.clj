@@ -3,8 +3,10 @@
    [clojure.edn :as edn]
    [clojure.java.io :as io]
    [clojure.string :as str]
-   [redis.utils :refer [keywordize]]
-   [taoensso.timbre :as log]))
+
+   [taoensso.timbre :as log]
+   
+   [redis.utils :refer [keywordize]]))
 
 ;; ------------------------------------------------------------------------------------------- Ruleset management
 (defn load-ruleset

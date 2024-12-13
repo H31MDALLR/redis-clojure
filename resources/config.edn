@@ -5,4 +5,4 @@
  :env/environment {:env #or [#env ENVIRONMENT "localhost"]}
  :handler/handle-connection {}
  :redis/config {:dir  "resources/test/rdb" 
-                :dbfilename "redis.rdb"}}
+                :dbfilename "keys_with_expiry.rdb"}}

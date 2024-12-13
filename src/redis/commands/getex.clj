@@ -1,10 +1,11 @@
 (ns redis.commands.getex
   (:require
+   [taoensso.timbre :as log]
+   
    [redis.commands.dispatch :as dispatch]
    [redis.encoding.resp2 :as resp2]
    [redis.session :as session]
-   [redis.storage :as storage]
-   [taoensso.timbre :as log]))
+   [redis.storage :as storage]))
 
 ;; TBD - support the  -EX part of the command
 (defmethod dispatch/command-dispatch :get

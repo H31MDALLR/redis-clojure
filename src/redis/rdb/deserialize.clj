@@ -9,7 +9,8 @@
    [taoensso.timbre :as log]
 
    [redis.rdb.schema :as schema]
-   [redis.rdb.transform :as transform]))
+   [redis.rdb.transform :as transform]
+   [redis.time :as time]))
 
 ; ----------------------------------------------------------------------------- Layer 0
 ; No deps on anything higher in the tree.
@@ -118,5 +119,18 @@
       second
       transform/transform-data)
   (rdb-file->database "resources/test/rdb/dump.rdb")
+
+  (do
+    (require '[java-time.api :as jt]
+     '[redis.time :as time]
+     '[redis.utils :as utils])
+    (def sample-expiry-db [{:type :aux, :k [114 101 100 105 115 45 118 101 114], :v [55 46 50 46 48]} {:type :aux, :k [114 101 100 105 115 45 98 105 116 115], :v [64]} {:type :selectdb, :db-number {:size 0}} {:type :resizdb-info, :db-hash-table-size {:size 3}, :expiry-hash-table-size {:size 3}} {:type :key-value, :expiry {:expiry 44172959069306880N, :type :expiry-ms, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k [109 97 110 103 111], :v [97 112 112 108 101]} {:type :key-value, :expiry {:expiry 3422276229857280N, :type :expiry-ms, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k [98 108 117 101 98 101 114 114 121], :v [112 101 97 114]} {:type :key-value, :expiry {:expiry 3422276229857280N, :type :expiry-ms, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k [112 101 97 114], :v [111 114 97 110 103 101]}])
+    (-> sample-expiry-db
+        transform/transform-data
+        (utils/apply-f-to-key :k binary-array->string)
+        ;time/expired?
+        ))
+  (-> (jt/instant 44172959069306880N)
+      time/expired?)
   
   ::leave-this-here)

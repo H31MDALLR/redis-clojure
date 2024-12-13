@@ -1,14 +1,14 @@
 (ns redis.rdb.schema
-  (:require
-   [clj-commons.byte-streams :as bs]
-   [clojure.java.io :as io]
-   [gloss.core :as gloss :refer [defcodec finite-frame header repeated]]
-   [gloss.core.codecs :refer [enum ordered-map]]
-   [gloss.core.structure :refer [compile-frame]]
-   [gloss.data.bytes.bits :refer [bit-seq]]
-   [manifold.deferred :as d]
-   [manifold.stream :as ms]
-   [taoensso.timbre :as log]))
+  (:require [clojure.java.io :as io]
+
+            [clj-commons.byte-streams :as bs]
+            [gloss.core :as gloss :refer [defcodec finite-frame header repeated]]
+            [gloss.core.codecs :refer [enum ordered-map]]
+            [gloss.core.structure :refer [compile-frame]]
+            [gloss.data.bytes.bits :refer [bit-seq]]
+            [manifold.deferred :as d]
+            [manifold.stream :as ms]
+            [taoensso.timbre :as log]))
 
 
 (defn hex->int
@@ -464,16 +464,17 @@
     (hex->int :0xFD) true
     false))
 
-(defn get-expiry [kind]
-  (condp = kind
-    (hex->int :0xFC) (ordered-map :type :expiry
-                                  :unit :seconds
-                                  :expiry (gloss/string :utf8 :length 8))
-    (hex->int :0xFD) (ordered-map
-                      :type :expiry-ms
-                      :unit :milliseconds
-                      :expiry (gloss/string :utf8 :length 8))
-    {}))
+(defn parse-expiry [kind]
+  (compile-frame
+   (condp = kind
+     :RDB_OPCODE_EXPIRETIME (ordered-map :kind :RDB_OPCODE_EXPIRETIME
+                                         :unit :seconds
+                                         :timestamp :uint32-le)
+     :RDB_OPCODE_EXPIRETIME_MS (ordered-map
+                                :kind :RDB_OPCODE_EXPIRETIME_MS
+                                :unit :milliseconds
+                                :timestamp :uint64-le)
+     {})))
 
 (defcodec rdb-header
   (ordered-map
@@ -503,18 +504,27 @@
                :db-number (parse-length)))
 
 (defn parse-key-value
-  [expiry-or-kind]
-  (let [expiry (get-expiry expiry-or-kind)
-        kind   (if (empty? expiry) expiry-or-kind (parse-header-byte))]
-    (log/trace ::key-value {:expiry      expiry
-                            :kind        kind
-                            :expiry-or-kind expiry-or-kind})
-    (compile-frame (ordered-map
-                    :type :key-value
-                    :expiry expiry
-                    :kind kind
-                    :k  (parse-string)
-                    :v (value-kind->value kind)))))
+  ([kind] (parse-key-value {} kind))
+  ([expiry-kind kind]
+   (log/trace ::key-value {:kind        kind})
+   (compile-frame (ordered-map
+                   :type :key-value
+                   :expiry expiry-kind
+                   :kind kind
+                   :k  (parse-string)
+                   :v (value-kind->value kind)))))
+
+(defn parse-key-value-with-expiry
+  [expiry-kind]
+  (header
+   (parse-expiry expiry-kind)
+   (fn [expiry-kind]
+     (header
+      (parse-header-byte)
+      (fn [kind]
+        (parse-key-value expiry-kind kind))
+      identity))
+   identity))
 
 (defcodec section-selector
   (header
@@ -523,6 +533,8 @@
      (log/trace ::section-selector {:header header})
      (case header
        :RDB_OPCODE_AUX auxiliary-field
+       :RDB_OPCODE_EXPIRETIME (parse-key-value-with-expiry header)
+       :RDB_OPCODE_EXPIRETIME_MS (parse-key-value-with-expiry header)
        :RDB_OPCODE_RESIZEDB resizedb-info
        :RDB_OPCODE_SELECTDB selectdb
        :RDB_OPCODE_EOF gloss/nil-frame
@@ -546,9 +558,11 @@
               '[clojure.pprint :as pp]
               '[clojure.walk :as walk]
               '[manifold.deferred :as d]
-              '[manifold.stream :as ms])
+              '[manifold.stream :as ms]
+              '[redis.rdb.deserialize :as deserialize]
+              '[redis.utils :as utils])
 
-    
+
     (defcodec sections
       (repeated section-selector :prefix :none :delimiters [-1]))
 
@@ -559,128 +573,29 @@
                           frame)
                         identity)
                 :delimiters [-1]))
-    
-    (defn apply-f-to-key [m k f]
-      (walk/postwalk
-       (fn [x]
-         (if (and (map? x) (contains? x k))
-           (update x k f)
-           x))
-       m))
 
-    (def test-file (-> (io/resource "test/rdb/dump.rdb")
+    (def test-file (-> (io/resource "test/rdb/keys_with_expiry.rdb")
                        io/input-stream
                        (bs/convert (bs/stream-of bytes))
 
                        #_bs/stream-of))
 
-    (defcodec rdb-zset-parsing
-      (ordered-map
-       :kind     (parse-header-byte)
-       :elements (parse-length)
-       :value    [:size (parse-length)
-                  :string-len (parse-length)]))
-
-    (defn parse-stream-id
-      []
-      (compile-frame
-       (ordered-map :ms :uint64-be ;; High 64 bits of stream ID
-                    :seq :uint64-be ;; Low 64 bits of stream ID
-                    )))
-
-    (defn parse-stream-listpack-3
-      []
-      (log/trace ::parse-stream-listpack3 :begin)
-      (header
-       (ordered-map :metadata :int16-le    ;; Metadata size, 2 bytes
-                    :stream-id (parse-stream-id)
-                    :content (parse-string))
-       (fn [{:keys [content metadata stream-id listpack-size elements-count]}]
-         (log/trace ::parse-stream-listpack3 {:metadata  metadata ;; unknown at this point
-                                              :stream-id stream-id
-                                              :content   content})
-     ;; Continue with listpack parsing
-         (ordered-map :type :RDB_TYPE_STREAM_LISTPACKS_3
-                      :metadata-size metadata
-                      :stream-id stream-id
-                      :content content
-                      :current-elements (parse-length)
-                      :flag :byte
-                      :last-id :uint64-be
-                      :first-stream-len (parse-length)
-                      :flag :byte
-                      :first-id :uint64-be
-                      :unknown :int32-le
-                      :padding :byte))
-       identity))
-
-                    ;;  :(parse-header-byte)
-                    ;;  :redis-ver auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :redis-bits auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :ctime auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :used-mem auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :aof-base auxiliary-field
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :dbselector selectdb
-                    ;; :(parse-header-byte) (parse-header-byte)
-                    ;; :resizedb resizedb-info
-                    ;; :kv-pair-header kv-pair-header
-                    ;; :ziplist length-encoding
-                    ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :next (expiry-or-value-type)
-                     ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :next (expiry-or-value-type)
-                    ;; :key (parse-string)
-                    ;; :value (parse-string)
-                    ;; :intset kv-pair-header
-                    ;; :intset-value intset-encoding
-                    ;; :next (expiry-or-value-type)
-    
     (defcodec test [rdb-header
-
                     section-selector
                     section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    section-selector
-                    ;sections
-                    
-
 
                     #_(repeated section-selector :prefix :none :delimiters [-1])])
 
-    (defcodec db [:header rdb-header
+    (defcodec db [rdb-header
                   sections])
     (try
-      (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file db))
+      (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file test))
       (catch Exception e
         (ex-message e))))
 
   (let [results @(-> decoder-ring-magic-header
                      ms/take!)
-        results (apply-f-to-key results :k binary-array->string)]
+        results (utils/apply-f-to-key results :k deserialize/binary-array->string)]
     (pp/pprint results))
 
 
@@ -715,11 +630,7 @@
       0x00 0x00 0x00 0x3 0x00] ;; 5 unknown bytes
      ])
 
-  (binary-array->string (byte-array [114 97 99 101 58 102 114 97 110 99 101]))
-
   (-> listpack-bytes (get 3) count)
-
-
 
 
   ::leave-this-here)

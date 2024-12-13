@@ -80,5 +80,9 @@
   (jt/after?  (add-duration (jt/instant) 100) (jt/instant))
   (expired? (add-duration (jt/instant) 100))
   (expired? past)
+  (jt/instant 1671963072573N)
+  (def ms [0x3D 0xD8 0xC3 0x48 0x85 0x01 0x00 0x00])
+  ()
+
   (jt/after? (jt/instant "2024-11-25T03:45:05.350066352Z") (jt/instant "2024-11-25T03:45:05.264Z"))
   "Leave this here.")

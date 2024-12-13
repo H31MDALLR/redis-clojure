@@ -1,9 +1,10 @@
 (ns redis.commands.keys
   (:require
+   [taoensso.timbre :as log]
+   
    [redis.commands.dispatch :as dispatch]
    [redis.encoding.resp2 :as resp2]
    [redis.session :as session]
-   [taoensso.timbre :as log]
    [redis.storage :as storage]))
 
 ;; ---------------------------------------------------------------------------- Layer 0

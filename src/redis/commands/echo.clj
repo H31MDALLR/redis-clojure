@@ -1,8 +1,9 @@
 (ns redis.commands.echo
   (:require
+   [taoensso.timbre :as log]
+   
    [redis.commands.dispatch :as dispatch]
-   [redis.encoding.resp2 :as resp2]
-   [taoensso.timbre :as log]))
+   [redis.encoding.resp2 :as resp2]))
 
 (defmethod dispatch/command-dispatch :echo
   [{:keys [command-info] :as ctx}]

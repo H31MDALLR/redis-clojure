@@ -1,9 +1,10 @@
 (ns redis.storage
   (:require
+   [taoensso.timbre :as log]
+
    [redis.backing-store :refer [backing-store]]
    [redis.parsing.glob :as glob]
-   [redis.time :as time]
-   [taoensso.timbre :as log]))
+   [redis.time :as time]))
 
 (defn add-db [db-id db]
   (swap! backing-store assoc db-id db))
@@ -59,7 +60,7 @@
   (-> @backing-store
       (get 0)
       :database
-      (get "mykey"))
+      (get "expires_ms_precision"))
 
   (let [store (atom {})
         kv {:k "mykey", :v {:value "Hello!"}}

@@ -2,11 +2,12 @@
   (:require
    [aleph.tcp :as tcp]
    [integrant.core :as ig]
+   [taoensso.timbre :as log]
+   
    [redis.config :as config]
    [redis.handlers :as handlers]
    [redis.rdb.deserialize :as deserialize]
    [redis.runtime :as runtime]
-   [taoensso.timbre :as log]
    [redis.storage :as storage])
   (:import
    [org.apache.commons.lang3.exception ExceptionUtils]))

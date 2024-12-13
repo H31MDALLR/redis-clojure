@@ -1,8 +1,9 @@
 (ns redis.decoder 
   (:require
+   [taoensso.timbre :as log]
+   
    [redis.parsing.options :as options]
-   [redis.utils :refer [keywordize]]
-   [taoensso.timbre :as log]))
+   [redis.utils :refer [keywordize]]))
 
 ;; ------------------------------------------------------------------------------------------- Layer 0
 

@@ -1,9 +1,9 @@
 (ns redis.config 
-  (:require
-   [aero.core :as aero]
-   [clojure.java.io :as io]
-   [integrant.core :as ig]
-   [taoensso.timbre :as log]))
+  (:require [clojure.java.io :as io]
+
+            [aero.core :as aero]
+            [integrant.core :as ig]
+            [taoensso.timbre :as log]))
 
 (def config (atom {}))
 
@@ -14,7 +14,7 @@
 
 (defmethod aero.core/reader 'ig/ref
   [{:keys [profile]
-    :or {profile "localhost"}
+    :or   {profile "localhost"}
     :as   opts} tag value]
   (ig/ref value))
 

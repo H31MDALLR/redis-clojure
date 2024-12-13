@@ -1,7 +1,8 @@
 (ns redis.commands.dispatch 
   (:require
-   [redis.encoding.resp2 :as resp2]
-   [taoensso.timbre :as log]))
+   [taoensso.timbre :as log]
+   
+   [redis.encoding.resp2 :as resp2]))
 
 (defmulti command-dispatch #(get-in % [:command-info :command]))
 
