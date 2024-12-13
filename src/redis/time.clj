@@ -80,7 +80,7 @@
   (jt/after?  (add-duration (jt/instant) 100) (jt/instant))
   (expired? (add-duration (jt/instant) 100))
   (expired? past)
-  (jt/instant 1671963072573N)
+  (-> (jt/instant 1640995200000N) expired?)
   (def ms [0x3D 0xD8 0xC3 0x48 0x85 0x01 0x00 0x00])
   ()
 

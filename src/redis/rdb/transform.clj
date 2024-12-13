@@ -4,13 +4,17 @@
 
 ; ----------------------------------------------------------------------------- Defs
 
-; ----------------------------------------------------------------------------- Load
+; ----------------------------------------------------------------------------- Layer 0
+;; no deps inside this file
 (defn bytes->string
   "Convert a sequence of bytes (integers) into a UTF-8 string."
   [byte-seq]
   (String. (byte-array byte-seq) "UTF-8"))
 
-; ----------------------------------------------------------------------------- Value parsing
+; ----------------------------------------------------------------------------- Layer 1
+;; only deps on layer 0
+
+; --------------------------------------------------------- Value parsing
 
 (defmulti parse-value (fn [kind _] kind))
 (defmethod parse-value :aux
@@ -132,7 +136,18 @@
   (log/warn ::parse-value :default {:anomaly :anomalies/incorrect})
   nil)
 
-; ----------------------------------------------------------------------------- Transform Interface
+; ----------------------------------------------------------------------------- Layer 2
+;; only depends on layer 1
+
+(defn calc-expiry [exp-map]
+  (let [{:keys [kind timestamp]} exp-map
+        expiry (if (every? some? [kind timestamp])
+                 (parse-value kind timestamp)
+                 nil)]
+    expiry))
+; ----------------------------------------------------------------------------- Layer 3
+;; only depends on layer 2
+; --------------------------------------------------------- Transform Interface
 
 (defmulti transform :type)
 (defmethod transform :aux [{:keys [type k v]}]
@@ -141,12 +156,9 @@
        :value (parse-value :aux v)}}})
 
 (defmethod transform :key-value [{:keys [expiry kind k v]}]
-  (let [{:keys [kind timestamp]} expiry
-        expiry (if (every? some? [kind timestamp]) 
-                 (parse-value kind timestamp) 
-                   nil)])
+  (log/trace ::transform :key-value {:expiry expiry})
   {:database
-   {k {:expiry expiry
+   {k {:expiry (calc-expiry expiry)
        :kind kind
        :value (parse-value kind v)}}})
 
@@ -170,9 +182,13 @@
 
 
 ; ----------------------------------------------------------------------------- REPL
-(comment 
+(comment
   (ns-unalias *ns* 'parse-value)
 
+  (def orange {:type :key-value, :expiry {:kind :RDB_OPCODE_EXPIRETIME_MS, :timestamp 1956528000000N, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k "orange", :v [114 97 115 112 98 101 114 114 121]})
+  (def blueberry {:type :key-value, :expiry {:kind :RDB_OPCODE_EXPIRETIME_MS, :timestamp 1640995200000N, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k "blueberry", :v [97 112 112 108 101]})
+  (transform blueberry)
+  (transform orange)
   ; --------------------------------------------------------- In memory format
 
   (def db-edn-format
@@ -247,10 +263,10 @@
   (def transformed-data
     (transform-data input-data))
 
-  (transform {:type   :key-value, 
-              :expiry {}, 
-              :kind   :RDB_TYPE_STRING, 
-              :k      "bike:1:stats", 
+  (transform {:type   :key-value,
+              :expiry {},
+              :kind   :RDB_TYPE_STRING,
+              :k      "bike:1:stats",
               :v      [0 0 3 -74 0 0 0 1]})
 
 ;; Print the transformed data
@@ -270,14 +286,15 @@
                     :v    [1520096]}
                    {:type :aux
                     :k    "aof-base"
-                    :v    [0]}]) 
-  
-  (reduce  (fn [acc curr] 
-             (merge-with into acc (transform curr))) 
+                    :v    [0]}])
+
+  (reduce  (fn [acc curr]
+             (merge-with into acc (transform curr)))
            {}
            input-data)
 
-  ::leave-this-here)
+  ::leave-this-here
+  )
 
 ; --------------------------------------------------------- Sample RDB AST
 

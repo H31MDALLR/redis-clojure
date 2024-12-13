@@ -19,5 +19,8 @@
 
 (comment 
   (storage/retrieve 0 "expires_ms_precision")
+  (storage/retrieve 0 "blueberry")
+  (storage/retrieve 0 "mango")
+
   (session/get-item :7f32ba48-04e0-488d-8c87-c11cac0d20db [:db])
   ::leave-this-here)

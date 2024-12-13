@@ -57,10 +57,23 @@
            value)))
 
 (comment
+  (require '[java-time.api :as jt])
   (-> @backing-store
       (get 0)
       :database
       (get "expires_ms_precision"))
+  
+  (swap! backing-store
+         update-in [0 :database]
+         assoc 
+         "blueberry"
+         {:expiry (jt/instant 1640995200000N), :kind :RDB_TYPE_STRING, :value "apple"})
+  
+  (swap! backing-store
+         update-in [0 :database]
+         assoc 
+         "orange"
+         {:expiry (jt/instant 1640995200000N), :kind :RDB_TYPE_STRING, :value "raspberry"})
 
   (let [store (atom {})
         kv {:k "mykey", :v {:value "Hello!"}}
