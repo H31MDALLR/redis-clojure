@@ -3,7 +3,7 @@
    [aleph.tcp :as tcp]
    [integrant.core :as ig]
    [taoensso.timbre :as log]
-   
+
    [redis.config :as config]
    [redis.handlers :as handlers]
    [redis.rdb.deserialize :as deserialize]
@@ -17,10 +17,11 @@
 
 ;; ---------------------------------------------------------------------------- State Handlers
 ;; -------------------------------------------------------- Aleph
-(defmethod ig/init-key :adapter/aleph [_ {:keys [handlers port rdb]
+(defmethod ig/init-key :adapter/aleph [_ {:keys [handlers port]
                                           :as   opts}]
   (log/info "Starting Aleph TCP socket server on port:" opts)
-  (let [connection-handler (-> handlers :connection)]
+  (let [connection-handler (-> handlers :connection)
+        port (or (-> @cli-opts :options :port) port)]
     (tcp/start-server
      connection-handler
      {:port port})))

@@ -10,7 +10,7 @@
 (defmethod dispatch/command-dispatch :get
   [{:keys [command-info session-id] :as ctx}]
   (let [{:keys [defaults]} command-info
-        db (session/get-item session-id [:db])
+        db (.get-item! session/sm session-id [:db])
         _ (log/trace ::command-dispatch :get {:db db
                                               :defaults defaults})
         v (storage/retrieve db (first defaults))]
@@ -22,5 +22,5 @@
   (storage/retrieve 0 "blueberry")
   (storage/retrieve 0 "mango")
 
-  (session/get-item :7f32ba48-04e0-488d-8c87-c11cac0d20db [:db])
+  (.get-item! session/sm :625cab57-1b8a-4163-8de3-1d3c4e5c2932 [:db])
   ::leave-this-here)

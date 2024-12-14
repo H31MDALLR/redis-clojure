@@ -11,7 +11,7 @@
 (defmethod dispatch/command-dispatch :get
   [{:keys [command-info session-id] :as ctx}]
   (let [{:keys [defaults options]} command-info
-        db (session/get-item session-id [:db])
+        db (.get-item! session/sm session-id [:db])
         _ (log/trace ::command-dispatch :getex {:db db
                                                 :defaults defaults
                                                 :options options})

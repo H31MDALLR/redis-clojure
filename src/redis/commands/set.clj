@@ -46,7 +46,7 @@
   (let [{:keys [defaults options]} command-info
         [k v]                      defaults
         {:keys [get nx xx]}        options 
-        db                         (session/get-item session-id [:db])
+        db                         (.get-item! session/sm session-id [:db])
 
         ;; grab it before write ops if needed
         get-result                 (when get (resp2/bulk-string (storage/retrieve db k)))
@@ -60,7 +60,7 @@
       ;; Expiration, NX and XX options parsing 
       (let [expiry         (time/map->map-with-expiry v options)
             value          (into {:value v} expiry)
-            db             (session/get-item session-id [:db])
+            db             (.get-item! session/sm session-id [:db])
             encoded-result (if (or nx xx) 
                              (store-and-get db k value nx xx)
                              (do (storage/store db k value)

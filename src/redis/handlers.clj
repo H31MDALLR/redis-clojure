@@ -84,7 +84,7 @@
 
 (defn handle-connection [socket info]
   (log/info "New connection from:" info)
-  (let [session-id (session/get-or-create-session (hash info))
+  (let [session-id (.get-or-create! session/sm (hash info))
         context    {:connection-info info
                     :session-id      session-id
                     :socket          socket}]
@@ -118,7 +118,7 @@
    (let [info {:remote-addr "127.0.0.1", :ssl-session nil, :server-port 6379, :server-name "localhost"}
          fingerprint (hash info)
          context    {:message get-banana
-                    :session-id      (session/get-or-create-session fingerprint)}]
+                    :session-id      (.get-or-create-session session/sm fingerprint)}]
      (handler context))
      
   (ns-unalias *ns* 'encoder)

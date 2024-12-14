@@ -12,7 +12,7 @@
 
 (defn keys-cmd [command-info session-id]
   (let [{:keys [defaults]} command-info
-        db (session/get-item session-id [:db])
+        db (.get-item! session/sm session-id [:db])
         matches (storage/find-keys db (first defaults))]
     (log/trace ::keys-cmd {:matches matches})
     matches))
