@@ -13,8 +13,8 @@
         process-cpu (try 
                      (.getProcessCpuLoad os-bean)
                      (catch Exception _ -1))]
-    (state/set-metric! [:cpu :used-cpu-sys] (if (neg? system-cpu) 0 (* 100 system-cpu)))
-    (state/set-metric! [:cpu :used-cpu-user] (if (neg? process-cpu) 0 (* 100 process-cpu)))))
+    (state/set-metric! [:cpu :used_cpu_sys] (if (neg? system-cpu) 0 (* 100 system-cpu)))
+    (state/set-metric! [:cpu :used_cpu_user] (if (neg? process-cpu) 0 (* 100 process-cpu)))))
 
 (def cpu-tracking-interval 1000) ; 1 second
 

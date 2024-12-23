@@ -2,63 +2,57 @@
   (:require [redis.metrics.state :as state]))
 
  
-(defn record-client-connection! [client-info]
-  (state/update-metric! [:clients :connected-clients] inc)
-  (state/update-metric! [:clients :client-infos (str (:id client-info))] merge client-info))
+(defn record-client-connection! [client_info]
+  (state/update-metric! [:clients :connected_clients] inc)
+  (state/update-metric! [:clients :client_infos (str (:id client_info))] merge client_info))
 
 (defn record-client-disconnection! [client-id]
-  (state/update-metric! [:clients :connected-clients] dec)
-  (state/update-metric! [:clients :client-infos] dissoc (str client-id)))
+  (state/update-metric! [:clients :connected_clients] dec)
+  (state/update-metric! [:clients :client_infos] dissoc (str client-id)))
 
 (defn record-client-buffer! [buffer-size direction]
   (let [buffer-key (case direction
-                    :input :client-recent-max-input-buffer
-                    :output :client-recent-max-output-buffer)]
+                    :input :client_recent_max_input_buffer
+                    :output :client_recent_max_output_buffer)]
     (state/update-metric! [:clients buffer-key] max buffer-size)))
 
 (defn record-client-blocked! [client-id command]
-  (state/update-metric! [:clients :blocked-clients] assoc client-id command))
+  (state/update-metric! [:clients :blocked_clients] assoc client-id command))
 
 (defn record-client-unblocked! [client-id]
-  (state/update-metric! [:clients :blocked-clients] dissoc client-id))
-
-(defn record-replication-role! [role]
-  (state/update-metric! [:replication] merge {:role role}))
-
-(defn record-replica-of! [{:keys [host port]}]
-  (state/update-metric! [:replication] merge {:host host :port port}))
+  (state/update-metric! [:clients :blocked_clients] dissoc client-id))
 
 (defn get-client-metrics []
-  (let [{:keys [connected-clients 
-                client-info 
-                blocked-clients 
-                tracking-clients
+  (let [{:keys [connected_clients 
+                client_info 
+                blocked_clients 
+                tracking_clients
                 pubsub-clients 
                 watching-clients 
-                clients-in-timeout-table]} (state/get-metric [:clients])]
-    {:connected-clients connected-clients
-     :client-recent-max-input-buffer (state/get-metric [:clients :client-recent-max-input-buffer])
-     :client-recent-max-output-buffer (state/get-metric [:clients :client-recent-max-output-buffer])
-     :blocked-clients (count blocked-clients)
-     :tracking-clients (count tracking-clients)
-     :clients-in-timeout-table (count clients-in-timeout-table)
-     :clients-by-flags (->> client-info
+                clients_in_timeout_table]} (state/get-metric [:clients])]
+    {:connected_clients connected_clients
+     :client_recent_max_input_buffer (state/get-metric [:clients :client_recent_max_input_buffer])
+     :client_recent_max_output_buffer (state/get-metric [:clients :client_recent_max_output_buffer])
+     :blocked_clients (count blocked_clients)
+     :tracking_clients (count tracking_clients)
+     :clients_in_timeout_table (count clients_in_timeout_table)
+     :clients_by_flags (->> client_info
                            vals
                            (mapcat :flags)
                            frequencies)}))
 
 (comment 
   ;; client fields we track.
-  :clients      {:connected-clients               0
+  :clients      {:connected_clients               0
                  :cluster-connections             0
                  :maxclients                      0
-                 :client-recent-max-input-buffer  0
-                 :client-recent-max-output-buffer 0
-                 :blocked-clients                 0
-                 :tracking-clients                0
+                 :client_recent_max_input_buffer  0
+                 :client_recent_max_output_buffer 0
+                 :blocked_clients                 0
+                 :tracking_clients                0
                  :pubsub-clients                  0
                  :watching-clients                0
-                 :clients-in-timeout-table        0
+                 :clients_in_timeout_table        0
                  :total-watched-keys              0
                  :total-blocking-keys             0
                  :total-blocking-keys-on-nokey    0}
@@ -66,7 +60,5 @@
   (get-client-metrics)
 
   (state/update-metric! [:replication] merge {:role (keyword "slave")})
-  (record-replication-role! "slave")
-  (record-replica-of! {:host "localhost" :port 6389})
   (record-client-connection! {:id "123" :flags #{"N"} :age 10 :idle 10 :events "r" :cmd nil})
   ::leave-this-here)

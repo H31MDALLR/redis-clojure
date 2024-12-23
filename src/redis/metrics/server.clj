@@ -5,10 +5,10 @@
   (state/set-metric! [:server :port] port))
 
 (defn update-config-file! [file]
-  (state/set-metric! [:server :config-file] file))
+  (state/set-metric! [:server :config_file] file))
 
 (defn update-io-threads! [threads]
-  (state/set-metric! [:server :io-threads] threads))
+  (state/set-metric! [:server :io_threads] threads))
 
 (defn get-server-metrics []
   (state/get-section :server))

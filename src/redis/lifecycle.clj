@@ -2,21 +2,33 @@
   (:require
    [aleph.tcp :as tcp]
    [integrant.core :as ig]
-   [taoensso.timbre :as log]
-
    [redis.config :as config]
    [redis.handlers :as handlers]
+   [redis.metrics.cpu :as cpu]
+   [redis.metrics.memory :as memory]
+   [redis.metrics.replication :as replication-metrics]
    [redis.rdb.deserialize :as deserialize]
    [redis.runtime :as runtime]
+   [redis.snowflake :as snowflake]
    [redis.storage :as storage]
-   [redis.metrics.memory :as memory]
-   [redis.metrics.cpu :as cpu]
-   [redis.metrics.clients :as client-metrics])
+   [taoensso.timbre :as log])
   (:import
    [org.apache.commons.lang3.exception ExceptionUtils]))
 
+
+
 ;; state
 (def cli-opts (atom {}))
+
+(defn set-replication-data 
+  "Set the replication data for the server."
+  [{:keys [host port]}]
+  (let [role (if (seq host) "slave" "master")]
+    (replication-metrics/update-connected-slaves! 0)
+    (replication-metrics/update-master-id! (snowflake/generate-snowflake))
+    (replication-metrics/update-role! role)
+    (replication-metrics/update-master-host! host)
+    (replication-metrics/update-master-port! port)))
 
 ;; ---------------------------------------------------------------------------- State Handlers
 ;; -------------------------------------------------------- Aleph
@@ -61,15 +73,12 @@
       (config/write [:redis/config (key kv)] (val kv)))
     
     (if (seq config-db)
-      (let [{:keys [dir dbfilename replicaof]} config-db
-            role (if (seq replicaof) "slave" "master")
+      (let [{:keys [dir dbfilename replicaof]} config-db 
             path (str dir "/" dbfilename)
             database       (deserialize/rdb-file->database path)]
         (storage/add-db (:id database) database)
+        (set-replication-data replicaof))
 
-        (client-metrics/record-replication-role! role)
-        (client-metrics/record-replica-of! replicaof))
-      
       ;; create an empty database at id 0 if no config passed.
       (storage/add-db 0 (deserialize/empty-db 0)))
     

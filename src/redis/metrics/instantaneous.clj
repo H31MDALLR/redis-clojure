@@ -10,34 +10,34 @@
 
 (defn update-instantaneous-metrics! []
   (let [now (System/currentTimeMillis)
-        last-time (or (state/get-metric [:instantaneous :last-update]) now)
+        last-time (or (state/get-metric [:instantaneous :last_update]) now)
         elapsed (- now last-time)
-        
+
         ;; Get current values
-        commands (state/get-metric [:stats :total-commands-processed])
-        input-bytes (state/get-metric [:stats :total-net-input-bytes])
-        output-bytes (state/get-metric [:stats :total-net-output-bytes])
-        
+        commands (state/get-metric [:stats :total_commands_processed])
+        input-bytes (state/get-metric [:stats :total_net_input_bytes])
+        output-bytes (state/get-metric [:stats :total_net_output_bytes])
+
         ;; Get last values
-        last-commands (state/get-metric [:instantaneous :last-commands])
-        last-input (state/get-metric [:instantaneous :last-input])
-        last-output (state/get-metric [:instantaneous :last-output])]
-    
+        last-commands (state/get-metric [:instantaneous :last_commands])
+        last-input (state/get-metric [:instantaneous :last_input])
+        last-output (state/get-metric [:instantaneous :last_output])]
+
     ;; Calculate rates
     (when (>= elapsed tracking-window-ms)
-      (state/set-metric! [:stats :instantaneous-ops-per-sec]
-                        (calculate-rate commands last-commands elapsed))
-      (state/set-metric! [:stats :instantaneous-input-kbps]
-                        (/ (calculate-rate input-bytes last-input elapsed) 1024))
-      (state/set-metric! [:stats :instantaneous-output-kbps]
-                        (/ (calculate-rate output-bytes last-output elapsed) 1024))
-      
+      (state/set-metric! [:stats :instantaneous_ops_per_sec]
+                         (calculate-rate commands last-commands elapsed))
+      (state/set-metric! [:stats :instantaneous_input_kbps]
+                         (/ (calculate-rate input-bytes last-input elapsed) 1024))
+      (state/set-metric! [:stats :instantaneous_output_kbps]
+                         (/ (calculate-rate output-bytes last-output elapsed) 1024))
+
       ;; Store current values for next calculation
       (state/set-metric! [:instantaneous]
-                        {:last-update now
-                         :last-commands commands
-                         :last-input input-bytes
-                         :last-output output-bytes}))))
+                         {:last_update now
+                          :last_commands commands
+                          :last_input input-bytes
+                          :last_output output-bytes}))))
 
 ;; Start the instantaneous metrics tracking
 (defn start-instantaneous-tracking! []

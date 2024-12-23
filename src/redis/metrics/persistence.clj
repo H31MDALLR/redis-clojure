@@ -5,19 +5,19 @@
   (state/set-metric! [:persistence :loading] loading?))
 
 (defn increment-changes! []
-  (state/update-metric! [:persistence :changes-since-save] inc))
+  (state/update-metric! [:persistence :changes_since_save] inc))
 
 (defn start-bgsave! []
-  (state/set-metric! [:persistence :bgsave-in-progress] true)
-  (state/set-metric! [:persistence :bgsave-start-time] (System/currentTimeMillis)))
+  (state/set-metric! [:persistence :bgsave_in_progress] true)
+  (state/set-metric! [:persistence :bgsave_start_time] (System/currentTimeMillis)))
 
 (defn complete-bgsave! [status]
-  (let [start-time (state/get-metric [:persistence :bgsave-start-time])
+  (let [start-time (state/get-metric [:persistence :bgsave_start_time])
         duration (- (System/currentTimeMillis) start-time)]
-    (state/set-metric! [:persistence :bgsave-in-progress] false)
-    (state/set-metric! [:persistence :last-save-time] (System/currentTimeMillis))
-    (state/set-metric! [:persistence :last-bgsave-status] status)
-    (state/set-metric! [:persistence :last-bgsave-duration] duration)))
+    (state/set-metric! [:persistence :bgsave_in_progress] false)
+    (state/set-metric! [:persistence :last_save_time] (System/currentTimeMillis))
+    (state/set-metric! [:persistence :last_bgsave_status] status)
+    (state/set-metric! [:persistence :last_bgsave_duration] duration)))
 
 (defn get-persistence-metrics []
   (state/get-section :persistence))

@@ -6,27 +6,27 @@
         total-memory (try
                       (.getTotalPhysicalMemorySize os-bean)
                       (catch Exception _ 0))]
-    (state/set-metric! [:memory :total-system-memory] total-memory)))
+    (state/set-metric! [:memory :total_system_memory] total-memory)))
 
 (defn track-memory-usage! [bytes]
-  (state/set-metric! [:memory :used-memory] bytes))
+  (state/set-metric! [:memory :used_memory] bytes))
 
 (defn track-rss! []
   (let [runtime (Runtime/getRuntime)
         rss (- (.totalMemory runtime) (.freeMemory runtime))]
-    (state/set-metric! [:memory :used-memory-rss] rss)))
+    (state/set-metric! [:memory :used_memory_rss] rss)))
 
 (defn track-lua-memory! [bytes]
-  (state/set-metric! [:memory :used-memory-lua] bytes))
+  (state/set-metric! [:memory :used_memory_lua] bytes))
 
 (defn track-script-memory! [bytes]
-  (state/set-metric! [:memory :used-memory-scripts] bytes))
+  (state/set-metric! [:memory :used_memory_scripts] bytes))
 
 (defn track-peak-memory! []
-  (let [current (state/get-metric [:memory :used-memory])
-        peak (state/get-metric [:memory :used-memory-peak])]
+  (let [current (state/get-metric [:memory :used_memory])
+        peak (state/get-metric [:memory :used_memory_peak])]
     (when (> current peak)
-      (state/set-metric! [:memory :used-memory-peak] current))))
+      (state/set-metric! [:memory :used_memory_peak] current))))
 
 (defn get-memory-info []
   (state/get-section :memory))
