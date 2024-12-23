@@ -8,7 +8,10 @@
    [redis.handlers :as handlers]
    [redis.rdb.deserialize :as deserialize]
    [redis.runtime :as runtime]
-   [redis.storage :as storage])
+   [redis.storage :as storage]
+   [redis.metrics.state :as metrics]
+   [redis.metrics.memory :as memory]
+   [redis.metrics.cpu :as cpu])
   (:import
    [org.apache.commons.lang3.exception ExceptionUtils]))
 
@@ -18,7 +21,7 @@
 ;; ---------------------------------------------------------------------------- State Handlers
 ;; -------------------------------------------------------- Aleph
 (defmethod ig/init-key :adapter/aleph [_ {:keys [handlers port]
-                                          :as   opts}]
+                                         :as   opts}]
   (log/info "Starting Aleph TCP socket server on port:" opts)
   (let [connection-handler (-> handlers :connection)
         port (or (-> @cli-opts :options :port) port)]
@@ -37,9 +40,8 @@
   (log/trace ::init-key :env/environment env)
   (let [environ (keyword env)
         profile (config/set-env environ)]
-
     (log/info ::init-key {:key :env/environment
-                          :profile profile})))
+                         :profile profile})))
 
 ;; -------------------------------------------------------- Handle Connection
 
@@ -48,14 +50,13 @@
   (fn [socket info]
     (handlers/handle-connection socket info)))
 
-
 ;; -------------------------------------------------------- Persistence
 (defmethod ig/init-key :redis/config [_ opts]
   (log/trace ::init-key :redis/config opts)
   (let [service-config (-> @cli-opts :options)
         config-db      (merge opts service-config)]
     (log/trace ::init-key :redis/config {:opts       opts
-                                         :cli-config service-config})
+                                        :cli-config service-config})
     (doseq [kv config-db]
       (config/write [:redis/config (key kv)] (val kv)))
     
@@ -70,6 +71,14 @@
     
     config-db))
 
+;; -------------------------------------------------------- Metrics
+(defmethod ig/init-key :redis/metrics [_ opts]
+  (log/trace ::init-key :redis/metrics opts)
+    
+    ;; Start background tracking services
+    (memory/start-memory-tracking!)
+    (cpu/start-cpu-tracking!)
+  opts)
 
 ;; ---------------------------------------------------------------------------- Run Server
 
@@ -102,21 +111,31 @@
 ;; ------------------------------------------------------------------------------------------- REPL
 (comment
 
-  (def system (atom (ig/init (config/get-configuration))))
-
-  (defn restart [system]
-    (ig/halt! @system)
-    (config/refresh-configuration)
-    (let [system (reset! system (ig/init (config/get-configuration)))]
-      system))
-
-  (defn halt []
-    (ig/halt! @system)
-    (reset! system nil))
+  (do 
+    (require '[user :refer [go reset reset-all halt set-prep! suspend]])
+    
+    
+    (defn start []
+      (set-prep!)
+      (go))
+    
+    (defn restart []
+      (reset)))
+  
+  (start)
+  (restart)
+  
+  (halt)
+  (suspend)
+  
+  (reset)
+  (reset-all)
   
   (storage/find-keys "*")
   
   (str (config/get-value [:redis/config :dir]) "/" (config/get-value [:redis/config :dbfilename]))
 
-  (restart system)
-  "Leave this here.")
+  "Leave this here."
+  )
+
+

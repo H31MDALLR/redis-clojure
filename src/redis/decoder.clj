@@ -50,6 +50,14 @@
   [ctx]
   (options/parse-result->command ctx 1))
 
+(defmethod decode :info
+  [{:keys [parse-result]
+    :as   ctx}]
+  (log/info ::decode :info ctx)
+  (let [[command & args] parse-result]
+    (assoc ctx :command-info {:command (keywordize command)
+                             :args args})))
+
 (defmethod decode :keys
   [ctx]
   (options/parse-result->command ctx 1))

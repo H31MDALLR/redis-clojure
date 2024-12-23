@@ -10,9 +10,10 @@
 ;; ---------------------------------------------------------------------------- SessionManager
 (defn create-new-session! [store fingerprint]
   (let [id (-> (random-uuid) .toString keyword)
-        session (merge {:db 0
+        session (merge {:created-at (time/now)
+                        :db 0
                         :fingerprint fingerprint
-                        :created-at (time/now)}
+                        :id id}
                        (time/set-expiry-time {:seconds [expiry-default]}))]
     (.store-session store id session)
     id))
@@ -21,7 +22,7 @@
   (if-let [session (.get-session-by-fingerprint store fingerprint)]
     (if (time/expired? (:expiry session))
       (do
-        (log/trace ::get-or-create-session {:renewing session})
+        (log/trace ::get-or-create!s {:renewing session})
         (this (:id session))
         (create-new-session! store fingerprint))
       session)

@@ -4,8 +4,6 @@
    [gloss.io :as io]
    [manifold.deferred :as d]
    [manifold.stream :as s]
-   [taoensso.timbre :as log]
-   
    [redis.commands.command]
    [redis.commands.config]
    [redis.commands.dispatch :as dispatch]
@@ -13,93 +11,92 @@
    [redis.commands.error]
    [redis.commands.get]
    [redis.commands.keys]
+   [redis.commands.info]
    [redis.commands.ping]
    [redis.commands.set]
    [redis.decoder :as decoder]
    [redis.encoding.resp2 :as resp2]
+   [redis.metrics.clients :as client-metrics]
    [redis.parsing.resp2 :as parser]
-   [redis.session :as session]))
+   [redis.session :as session]
+   [taoensso.timbre :as log]))
 
 ;; ------------------------------------------------------------------------------------------- Defs
 (log/set-min-level! :trace)
+
+
+;; ---------------------------------------------------------------------------- Layer 0
+;; only depends on things outside of this namespace.
+
+;; -------------------------------------------------------- Handler
+
 (defn handler
   [ctx]
   (log/info ::handler ctx)
   (->> ctx
        parser/parse-resp
        decoder/decode
-       dispatch/command-dispatch))
-
-;; ------------------------------------------------------------------------------------------- Handler
-
-(def protocol
-  (gloss/compile-frame
-   (gloss/finite-frame :uint32
-                       (gloss/string :utf-8))))
+       dispatch/dispatch-command))
 
 
-(defn wrap-duplex-stream
-  [protocol s]
-  (let [out (s/stream)]
-    (s/connect
-     (s/map #(io/encode protocol %) out)
-     s)
-    (s/splice
-     out
-     (io/decode-stream s protocol))))
-
-;; ------------------------------------------------------------------------------------------- Network I/O
-
-(defn chain-test
-  [f]
-  (fn [s info]
-
-    (log/info "New connection from:" info)
-  ;; `socket` is a duplex stream, you can read and write to it
-    (d/loop []
-      (-> (s/take! s ::none)
-          (d/chain  (fn [msg]
-                      (if (= ::none msg)
-                        ::none
-                        (d/future (f msg))))
-                    (fn [msg]
-                      (s/put! s msg))
-                    (fn [result]
-                      (when result
-                        (d/recur))))
-          (d/catch
-           (fn [ex]
-             (s/put! s (resp2/error ex))
-             (s/close! s)))))))
-
-;; ------------------------------------------------------------------------------------------- Exposed Handlers
+;; ---------------------------------------------------------------------------- Layer 1
+;; only depends on things in layer 0
 
 (defn handle-message [context]
   (try
     (let [{:keys [response]} (handler context)]
-      (log/info "Sending response:" response)
+      (log/info ::handle-message {:response response})
+      ;; Track output buffer size
+      (when (string? response)
+        (client-metrics/record-client-buffer!  (count (.getBytes response "UTF-8")) 
+                                               :output))
       (s/put! (:socket context) response))
     (catch Exception e
-      (log/error e "Error handling message"))))
+      (log/error ::handle-message {:anomaly :anomalies/fault
+                                   :error e}))))
+
+;; ---------------------------------------------------------------------------- Layer 2
+;; only depends on things in layer 1
 
 (defn handle-connection [socket info]
-  (log/info "New connection from:" info)
-  (let [session-id (.get-or-create! session/sm (hash info))
-        context    {:connection-info info
-                    :session-id      session-id
-                    :socket          socket}]
-    (s/consume
-     (fn [raw-message]
-       (try
-         (let [message (String. raw-message "UTF-8")
-               context (assoc context :message message)] ;; Decode incoming bytes
-           (log/info "Received message:" message)
-           (handle-message context))
-         (catch Exception e
-           (log/error e "Error decoding message" e)
-           (s/close! socket)))) ;; Close on error
-     socket)))
+  (log/info ::handle-connection {:connection info})
+  (let [session-id  (.get-or-create! session/sm (hash info))
+        client-id   (str session-id)
+        client-info {:id       client-id
+                     :addr     (:remote-addr info)
+                     :port     (:server-port info)
+                     :name     nil
+                     :age      0
+                     :idle     0
+                     :flags    #{}
+                     :db       0
+                     :tracking false
+                     :timeout  0}]
+    (log/info ::handle-connection {:client-info client-info})
 
+    ;; Record the new client connection using the passed in tracker
+    (client-metrics/record-client-connection! client-info)
+
+    ;; Add cleanup on socket close
+    (s/on-closed socket #(client-metrics/record-client-disconnection! client-id))
+    
+    (let [context {:connection-info info
+                   :session-id      session-id
+                   :client-id       client-id
+                   :socket          socket}]
+      (s/consume
+       (fn [raw-message]
+         (try
+           (let [message (String. raw-message "UTF-8")
+                 ;; Track input buffer size
+                 _       (client-metrics/record-client-buffer! (count raw-message) :input)
+                 context (assoc context :message message)]
+             (log/info ::handle-connection {:message message})
+             (handle-message context))
+           (catch Exception e
+             (log/error ::handle-connection {:error e})
+             (s/close! socket)))) ;; Close on error
+       socket))))
 ;; ------------------------------------------------------------------------------------------- REPL AREA
 
 (comment
@@ -115,12 +112,15 @@
     (def echo-command "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n"))
 
   
-   (let [info {:remote-addr "127.0.0.1", :ssl-session nil, :server-port 6379, :server-name "localhost"}
-         fingerprint (hash info)
-         context    {:message get-banana
-                    :session-id      (.get-or-create-session session/sm fingerprint)}]
-     (handler context))
-     
+  (let [info        {:remote-addr "127.0.0.1"
+                     :ssl-session nil
+                     :server-port 6379
+                     :server-name "localhost"}
+        fingerprint (hash info)
+        context     {:message    docs-command
+                     :session-id (.get-or-create! session/sm fingerprint)}]
+    (handler context))
+  
   (ns-unalias *ns* 'encoder)
   (handler echo-command)
   (handler docs-command)
@@ -130,5 +130,43 @@
 
   (let [[one two] '("test" "stuff")]
     [one two])
+  
+   ;; ----------------------------------------------------- ALEPH examples 
+  
+  (def protocol
+    (gloss/compile-frame
+     (gloss/finite-frame :uint32
+                         (gloss/string :utf-8))))
+  (defn chain-test
+    [f]
+    (fn [s info]
+
+      (log/info "New connection from:" info)
+  ;; `socket` is a duplex stream, you can read and write to it
+      (d/loop []
+        (-> (s/take! s ::none)
+            (d/chain  (fn [msg]
+                        (if (= ::none msg)
+                          ::none
+                          (d/future (f msg))))
+                      (fn [msg]
+                        (s/put! s msg))
+                      (fn [result]
+                        (when result
+                          (d/recur))))
+            (d/catch
+             (fn [ex]
+               (s/put! s (resp2/error ex))
+               (s/close! s)))))))
+
+  (defn wrap-duplex-stream
+    [protocol s]
+    (let [out (s/stream)]
+      (s/connect
+       (s/map #(io/encode protocol %) out)
+       s)
+      (s/splice
+       out
+       (io/decode-stream s protocol))))
 
   "leave this here.")

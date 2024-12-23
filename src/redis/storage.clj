@@ -4,7 +4,28 @@
 
    [redis.backing-store :refer [backing-store]]
    [redis.parsing.glob :as glob]
-   [redis.time :as time]))
+   [redis.time :as time]
+   [redis.metrics.memory :as memory]))
+
+(defn- estimate-value-size [value]
+  (cond
+    (string? value) (* 2 (count value))  ; UTF-16 chars
+    (bytes? value) (count value)
+    (number? value) 8  ; Assuming 64-bit numbers
+    :else 16))  ; Default size for other types
+
+(defn- estimate-key-size [k]
+  (* 2 (count (str k))))  ; UTF-16 chars
+
+(defn- track-memory-for-value! [k v]
+  (let [key-size (estimate-key-size k)
+        value-size (estimate-value-size v)]
+    (memory/track-memory-usage! (+ key-size value-size))))
+
+(defn- untrack-memory-for-value! [k v]
+  (let [key-size (estimate-key-size k)
+        value-size (estimate-value-size v)]
+    (memory/track-memory-usage! (- (+ key-size value-size)))))
 
 (defn add-db [db-id db]
   (swap! backing-store assoc db-id db))
@@ -39,6 +60,8 @@
                                :db       db
                                :k        k
                                :v        value})
+        (when value 
+          (untrack-memory-for-value! k value))
         (swap! backing-store update-in [db :database] dissoc k)
         nil)
       value)))
@@ -47,7 +70,11 @@
   (log/trace ::store {:k k
                       :v v})
   
-  (let [value (time/update-last-write-access v)]
+  (let [old-value (get-in @backing-store [db :database k :value])
+        value (time/update-last-write-access v)]
+    (when old-value
+      (untrack-memory-for-value! k old-value))
+    (track-memory-for-value! k (:value value))
     (log/trace ::store {:updated-value value})
     (swap! backing-store 
            update-in 
@@ -55,6 +82,8 @@
            assoc
            k
            value)))
+
+(defn get-all-dbs [] (keys @backing-store))
 
 (comment
   (require '[java-time.api :as jt])

@@ -50,12 +50,17 @@
 
 ;; ------------------------------------------------------------------------------------------- Layer 1
 ;; -------------------------------------------------------- Dispatch
-(defmethod dispatch/command-dispatch :config
-  [{:keys [command-info] :as ctx}] 
+
+(defn impl-config [{:keys [command-info] :as ctx}]
   (let [{:keys [subcommand options]} command-info]
     (log/info ::command-dispatch :config {:subcommand subcommand
                                           :options    options})
     (assoc ctx :response (exec-command (keywordize subcommand) options))))
+
+
+(defmethod dispatch/command-dispatch :config
+  [ctx] 
+  (impl-config ctx))
 
 
 ;; ----------------------------------------------------------------------------REPL AREA

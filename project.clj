@@ -7,7 +7,7 @@
                  [org.clojure/core.async "1.6.681"]
                  [org.clojure/tools.cli "1.1.230"]
 
-                 ;; caommand line
+                 ;; command line
                  [org.clojure/tools.cli "1.1.230"]
                  
                  ;; compression
@@ -15,6 +15,7 @@
                  
                  ;; configuration 
                  [integrant "0.13.1"]
+                 [integrant/repl "0.4.0"]
 
                  ;; exception utils
                  [org.apache.commons/commons-lang3 "3.17.0"]
@@ -45,5 +46,21 @@
   :target-path "/tmp/codecrafters-redis-target/%s"
   :clean-targets ^{:protect false} ["/tmp/codecrafters-redis-target"]
   :resource-paths ["resources"]
-  :profiles {:uberjar {:aot :all
-                       :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}})
+  :profiles {:development {
+                           :dependencies []
+                           :source-paths ["bb" "dev" "src"]
+                           :repl-options {:init-ns user}
+                           }
+             :test        {
+                           :dependencies [[integrant/repl "0.4.0"]
+                                          [com.jakemccrary/lein-test-refresh "0.26.0"]
+                                          [com.github.seancorfield/expectations "2.2.214"]
+                                          [lein-ancient "1.0.0-RC3"]
+                                          [pjstadig/humane-test-output "0.11.0"]]
+                           :injections   [(require 'pjstadig.humane-test-output)
+                                          (pjstadig.humane-test-output/activate!)]
+                           :source-paths ["test"]
+                           :repl-options {:init-ns user}}
+             :dev         [:development :test]
+             :uberjar     {:aot      :all
+                           :jvm-opts ["-Dclojure.compiler.direct-linking=true"]}})

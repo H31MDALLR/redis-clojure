@@ -1,8 +1,10 @@
 {:adapter/aleph {:env #ig/ref :env/environment
                  :port 6379
                  :handlers {:connection #ig/ref :handler/handle-connection}
-                 :config #ig/ref :redis/config} 
+                 :config #ig/ref :redis/config
+                 :metrics #ig/ref :redis/metrics} 
  :env/environment {:env #or [#env ENVIRONMENT "localhost"]}
- :handler/handle-connection {}
+ :handler/handle-connection {:metrics #ig/ref :redis/metrics}
  :redis/config {:dir  "resources/test/rdb" 
-                :dbfilename "keys_with_expiry.rdb"}}
+                :dbfilename "keys_with_expiry.rdb"}
+ :redis/metrics {}}

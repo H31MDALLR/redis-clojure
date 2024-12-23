@@ -28,7 +28,7 @@
       (do (log/error "Mutually exlusive expiration options made it through parsing!" (filter some? expiry-keys))
           (resp2/error (str "Expiration options are mutually exclusive, given: " (filter some? expiry-keys)))))))
 
-(defn- store-and-get [db k value nx xx]
+(defn store-and-get [db k value nx xx]
   (let [get-result          (storage/retrieve db k)]
     (storage/store db k value)
     (cond
@@ -37,12 +37,8 @@
       (and xx (empty? get-result)) (resp2/bulk-string nil)
       (and xx (seq get-result)) (resp2/bulk-string get-result))))
 
-
-;; ------------------------------------------------------------------------------------------- Dispatch
-
-(defmethod dispatch/command-dispatch :set
-  [{:keys [command-info session-id]
-    :as   ctx}]
+(defn impl-set [{:keys [command-info session-id]
+                 :as   ctx}]
   (let [{:keys [defaults options]} command-info
         [k v]                      defaults
         {:keys [get nx xx]}        options 
@@ -72,6 +68,13 @@
         (if get 
           (assoc ctx :response get-result)
           (assoc ctx :response encoded-result))))))
+
+
+;; ------------------------------------------------------------------------------------------- Dispatch
+
+(defmethod dispatch/command-dispatch :set
+  [ctx]
+  (impl-set ctx))
 
 
 ;; ------------------------------------------------------------------------------------------- REPL AREA

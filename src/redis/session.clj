@@ -18,7 +18,7 @@
 ;; ---------------------------------------------------------------------------- REPL AREA
 
 (comment
-4 
+
   (.sessionmanager/add-item sm :1234 [:test :path :to :a :key] "updated-value")
   (.sessionmanager/add-item sm :4444 [:test :path :to :a :key] "different-value")
   (.sessionmanager/delete-item sm :4444 [:test :path :to :a])

@@ -1,13 +1,12 @@
 (ns redis.commands.get
   (:require
-   [taoensso.timbre :as log]
-   
    [redis.commands.dispatch :as dispatch]
    [redis.encoding.resp2 :as resp2]
    [redis.session :as session]
-   [redis.storage :as storage]))
+   [redis.storage :as storage]
+   [taoensso.timbre :as log]))
 
-(defmethod dispatch/command-dispatch :get
+(defn impl-get 
   [{:keys [command-info session-id] :as ctx}]
   (let [{:keys [defaults]} command-info
         db (.get-item! session/sm session-id [:db])
@@ -16,6 +15,12 @@
         v (storage/retrieve db (first defaults))]
     (log/trace ::command-dispatch :get {:value v})
     (assoc ctx :response (resp2/bulk-string v))))
+
+
+(defmethod dispatch/command-dispatch :get
+  [ctx]
+  (impl-get ctx))
+
 
 (comment 
   (storage/retrieve 0 "expires_ms_precision")

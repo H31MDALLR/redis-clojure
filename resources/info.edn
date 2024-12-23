@@ -1,0 +1,220 @@
+{:server       {:redis-version            "0.0.0"
+                :redis-git-sha1           ""
+                :redis-git-dirty          "0"
+                :redis-build-id           ""
+                :redis-mode               "standalone"
+                :os                       ""
+                :arch-bits                64
+                :multiplexing-api         ""
+                :atomicvar-api            ""
+                :gcc-version              ""
+                :process-id               0
+                :process-supervised       "no"
+                :run-id                   ""
+                :tcp-port                 6379
+                :server-time-usec         0
+                :uptime-in-seconds        0
+                :uptime-in-days           0
+                :hz                       10
+                :configured-hz            10
+                :lru-clock                0
+                :executable               ""
+                :config-file              ""
+                :io-threads-active        0
+                :shutdown-in-milliseconds 0}
+
+ :clients      {:client-infos                    {}
+                :connected-clients               0
+                :cluster-connections             0
+                :maxclients                      0
+                :client-recent-max-input-buffer  0
+                :client-recent-max-output-buffer 0
+                :blocked-clients                 {}
+                :tracking-clients                {}
+                :pubsub-clients                  {}
+                :watching-clients                {}
+                :clients-in-timeout-table        {}
+                :total-watched-keys              0
+                :total-blocking-keys             0
+                :total-blocking-keys-on-nokey    0}
+
+ :memory       {:used-memory                   0
+                :used-memory-human             "0B"
+                :used-memory-rss               0
+                :used-memory-rss-human         "0B"
+                :used-memory-peak              0
+                :used-memory-peak-human        "0B"
+                :used-memory-peak-perc         "0%"
+                :used-memory-overhead          0
+                :used-memory-startup           0
+                :used-memory-dataset           0
+                :used-memory-dataset-perc      "0%"
+                :total-system-memory           0
+                :total-system-memory-human     "0B"
+                :used-memory-lua               0
+                :used-memory-vm-eval           0
+                :used-memory-lua-human         "0B"
+                :used-memory-scripts-eval      0
+                :number-of-cached-scripts      0
+                :number-of-functions           0
+                :number-of-libraries           0
+                :used-memory-vm-functions      0
+                :used-memory-vm-total          0
+                :used-memory-vm-total-human    "0B"
+                :used-memory-functions         0
+                :used-memory-scripts           0
+                :used-memory-scripts-human     "0B"
+                :maxmemory                     0
+                :maxmemory-human               "0B"
+                :maxmemory-policy              "noeviction"
+                :mem-fragmentation-ratio       0.0
+                :mem-fragmentation-bytes       0
+                :allocator-frag-ratio          0.0
+                :allocator-frag-bytes          0
+                :allocator-rss-ratio           0.0
+                :allocator-rss-bytes           0
+                :rss-overhead-ratio            0.0
+                :rss-overhead-bytes            0
+                :allocator-allocated           0
+                :allocator-active              0
+                :allocator-resident            0
+                :mem-not-counted-for-evict     0
+                :mem-clients-slaves            0
+                :mem-clients-normal            0
+                :mem-aof-buffer                0
+                :mem-replication-backlog       0
+                :mem-total-replication-buffers 0
+                :mem-allocator                 "jemalloc"
+                :active-defrag-running         0
+                :lazyfree-pending-objects      0
+                :lazyfreed-objects             0}
+
+ :persistence  {:loading                      0
+                :async-loading                0
+                :current-cow-peak             0
+                :current-cow-size             0
+                :current-cow-size-age         0
+                :current-fork-perc            0
+                :current-save-keys-processed  0
+                :current-save-keys-total      0
+                :rdb-changes-since-last-save  0
+                :rdb-bgsave-in-progress       0
+                :rdb-last-save-time           0
+                :rdb-last-bgsave-status       "ok"
+                :rdb-last-bgsave-time-sec     0
+                :rdb-current-bgsave-time-sec  0
+                :rdb-last-cow-size            0
+                :rdb-last-load-keys-expired   0
+                :rdb-last-load-keys-loaded    0
+                :aof-enabled                  0
+                :aof-rewrite-in-progress      0
+                :aof-rewrite-scheduled        0
+                :aof-last-rewrite-time-sec    0
+                :aof-current-rewrite-time-sec 0
+                :aof-last-bgrewrite-status    "ok"
+                :aof-last-write-status        "ok"
+                :aof-last-cow-size            0
+                :module-fork-in-progress      0
+                :module-fork-last-cow-size    0
+                :aof-rewrites                 0
+                :rdb-saves                    0
+                :aof-current-size             0
+                :aof-base-size                0
+                :aof-pending-rewrite          0
+                :aof-buffer-length            0
+                :aof-pending-bio-fsync        0
+                :aof-delayed-fsync            0}
+
+ :stats        {:total-connections-received     0
+                :total-commands-processed       0
+                :instantaneous-ops-per-sec      0
+                :total-net-input-bytes          0
+                :total-net-output-bytes         0
+                :total-net-repl-input-bytes     0
+                :total-net-repl-output-bytes    0
+                :instantaneous-input-kbps       0
+                :instantaneous-output-kbps      0
+                :instantaneous-input-repl-kbps  0
+                :instantaneous-output-repl-kbps 0
+                :rejected-connections           0
+                :sync-full                      0
+                :sync-partial-ok                0
+                :sync-partial-err               0
+                :expired-keys                   0
+                :expired-stale-perc             0
+                :expired-time-cap-reached-count 0
+                :expire-cycle-cpu-milliseconds  0
+                :evicted-keys                   0
+                :evicted-clients                0
+                :total-eviction-exceeded-time   0
+                :current-eviction-exceeded-time 0
+                :keyspace-hits                  0
+                :keyspace-misses                0
+                :pubsub-channels                0
+                :pubsub-patterns                0
+                :latest-fork-usec               0
+                :total-forks                    0
+                :migrate-cached-sockets         0
+                :slave-expires-tracked-keys     0
+                :active-defrag-hits             0
+                :active-defrag-misses           0
+                :active-defrag-key-hits         0
+                :active-defrag-key-misses       0
+                :tracking-total-keys            0
+                :tracking-total-items           0
+                :tracking-total-prefixes        0
+                :unexpected-error-replies       0
+                :total-error-replies            0
+                :dump-payload-sanitizations     0
+                :total-reads-processed          0
+                :total-writes-processed         0}
+
+ :replication  {:role                           "master"
+                :master-failover-state          "no-failover"
+                :master-replid                  ""
+                :master-replid2                 ""
+                :master-repl-offset             0
+                :second-repl-offset             0
+                :repl-backlog-active            0
+                :repl-backlog-size              0
+                :repl-backlog-first-byte-offset 0
+                :repl-backlog-histlen           0
+                :master-host                    ""
+                :master-port                    0
+                :master-link-status             "down"
+                :master-last-io-seconds-ago     0
+                :master-sync-in-progress        0
+                :slave-read-repl-offset         0
+                :slave-repl-offset              0
+                :slave-priority                 0
+                :slave-read-only                1
+                :connected-slaves               0
+                :min-slaves-good-slaves         0}
+
+ :cpu          {:used-cpu-sys              0.0
+                :used-cpu-user             0.0
+                :used-cpu-sys-children     0.0
+                :used-cpu-user-children    0.0
+                :used-cpu-sys-main-thread  0.0
+                :used-cpu-user-main-thread 0.0}
+
+ :commandstats {}  ; Will be populated with command statistics
+ 
+ :latencystats {} ; Will be populated with latency statistics
+ 
+ :errorstats   {}   ; Will be populated with error statistics
+ 
+ :cluster      {:cluster-enabled 0}
+
+ :modules      {}      ; Will be populated with module information
+ 
+ :keyspace     {}     ; Will be populated with database statistics
+ 
+ :debug        {:eventloop-duration-aof-sum  0
+                :eventloop-duration-cron-sum 0
+                :eventloop-duration-max      0
+                :eventloop-cmd-per-cycle-max 0
+                :allocator-allocated-lua     0
+                :allocator-active-lua        0
+                :allocator-resident-lua      0
+                :allocator-frag-bytes-lua    0}}
