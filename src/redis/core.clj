@@ -1,6 +1,7 @@
 (ns redis.core
   (:gen-class)
   (:require
+   [clojure.string :as str]
    [clojure.tools.cli :refer [parse-opts]]
    [redis.lifecycle :as lifecycle]
    [taoensso.timbre :as log]))
@@ -25,7 +26,14 @@
     :validate [string?]]
    ["-p" "--port PORT" "A port number the database will listen on."
     :validate [numeric-string?]
-    :assoc-fn (fn [m k v]  (assoc m k (Integer/parseInt v)))]])
+    :assoc-fn (fn [m k v]  (assoc m k (Integer/parseInt v)))]
+   ["--replicaof" "--replicaof HOST PORT" "Replica of another Redis instance."
+    :parse-fn (fn [s] (str/split s #" "))
+    :validate [(fn [v] (and (vector? v) (= 2 (count v))))]
+    :assoc-fn (fn [m k [host port]]
+                (assoc m k {:host host
+                           :port (Integer/parseInt port)}))]
+   ])
 
 ;; ---------------------------------------------------------------------------- Main
 
@@ -42,6 +50,7 @@
 
 (comment
 
+  (parse-opts '("--port" "6255" "--replicaof" "localhost 6389") cli-options) 
   (parse-opts '("--port" "6389") cli-options)
   (parse-opts '("--dir" "resources/rdb" "--dbfilename" "dump.rdb") cli-options)
   "leave this here.")

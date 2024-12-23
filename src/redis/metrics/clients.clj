@@ -22,6 +22,12 @@
 (defn record-client-unblocked! [client-id]
   (state/update-metric! [:clients :blocked-clients] dissoc client-id))
 
+(defn record-replication-role! [role]
+  (state/update-metric! [:replication] merge {:role role}))
+
+(defn record-replica-of! [{:keys [host port]}]
+  (state/update-metric! [:replication] merge {:host host :port port}))
+
 (defn get-client-metrics []
   (let [{:keys [connected-clients 
                 client-info 
@@ -58,7 +64,9 @@
                  :total-blocking-keys-on-nokey    0}
   
   (get-client-metrics)
- 
-  
+
+  (state/update-metric! [:replication] merge {:role (keyword "slave")})
+  (record-replication-role! "slave")
+  (record-replica-of! {:host "localhost" :port 6389})
   (record-client-connection! {:id "123" :flags #{"N"} :age 10 :idle 10 :events "r" :cmd nil})
   ::leave-this-here)

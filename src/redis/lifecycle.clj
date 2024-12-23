@@ -9,9 +9,9 @@
    [redis.rdb.deserialize :as deserialize]
    [redis.runtime :as runtime]
    [redis.storage :as storage]
-   [redis.metrics.state :as metrics]
    [redis.metrics.memory :as memory]
-   [redis.metrics.cpu :as cpu])
+   [redis.metrics.cpu :as cpu]
+   [redis.metrics.clients :as client-metrics])
   (:import
    [org.apache.commons.lang3.exception ExceptionUtils]))
 
@@ -61,10 +61,14 @@
       (config/write [:redis/config (key kv)] (val kv)))
     
     (if (seq config-db)
-      (let [{:keys [dir dbfilename]} config-db
+      (let [{:keys [dir dbfilename replicaof]} config-db
+            role (if (seq replicaof) "slave" "master")
             path (str dir "/" dbfilename)
             database       (deserialize/rdb-file->database path)]
-        (storage/add-db (:id database) database))
+        (storage/add-db (:id database) database)
+
+        (client-metrics/record-replication-role! role)
+        (client-metrics/record-replica-of! replicaof))
       
       ;; create an empty database at id 0 if no config passed.
       (storage/add-db 0 (deserialize/empty-db 0)))
