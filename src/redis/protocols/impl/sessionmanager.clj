@@ -18,12 +18,12 @@
     (.store-session store id session)
     id))
 
-(defn get-or-create! [store fingerprint this]
+(defn get-or-create! [store fingerprint]
   (if-let [session (.get-session-by-fingerprint store fingerprint)]
     (if (time/expired? (:expiry session))
       (do
         (log/trace ::get-or-create!s {:renewing session})
-        (this (:id session))
+        (.delete-session store (:id session))
         (create-new-session! store fingerprint))
       session)
     (create-new-session! store fingerprint)))

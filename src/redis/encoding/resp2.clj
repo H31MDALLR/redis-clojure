@@ -1,6 +1,4 @@
-(ns redis.encoding.resp2 
-  (:require
-    [redis.parsing.resp2 :as parser]))
+(ns redis.encoding.resp2)
 
 ;; ------------------------------------------------------------------------------------------- RESPN Encoding
 
@@ -48,14 +46,14 @@
 ;; ------------------------------------------------------------------------------------------- REPL
 (comment 
   (require '[redis.parsing.resp2 :as parser])
-  (-> {:array [{:integer 1}
+  (->> {:array [{:integer 1}
                {:bulk-string "hello"}
                {:simple-string "world"}]}
       encode-resp
+      (assoc {} :message)
       parser/parse-resp)
   (encode-resp {:array [{:integer 1}
                         {:bulk-string "hello"}
                         {:simple-string "world"}]})
-  ;; "*3\r\n:1\r\n$5\r\nhello\r\n+world\r\n"
 
   "Leave this here.")

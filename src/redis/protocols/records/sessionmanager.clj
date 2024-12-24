@@ -13,9 +13,9 @@
     (log/trace ::expire-session id)
     (.delete-session store id))
 
-  (get-or-create! [this fingerprint]
+  (get-or-create! [_ fingerprint]
     (log/trace ::create-session :enter)
-    (impl/get-or-create! store fingerprint this))
+    (impl/get-or-create! store fingerprint))
 
   (add-item! [_ id path v] (impl/add-item! store id path v))
   (delete-item! [_ id path] (impl/delete-item! store id path))
