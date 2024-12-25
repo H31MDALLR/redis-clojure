@@ -10,21 +10,8 @@
             [manifold.stream :as ms]
             [taoensso.timbre :as log]))
 
-
-(defn hex->int
-  "Takes an expected hex value as key and returns the integer mapping"
-  [hex-key]
-  (let [hexmap {:0xFA 250
-                :0xFB 251
-                :0xFC 252
-                :0xFD 253
-                :0xFE 254
-                :0xFF 255}]
-    (get hexmap hex-key)))
-
 ;; Length Encoding
 (defcodec encoding-type (enum :byte {:short 0 :medium 1 :long 2 :special 3}))
-
 
 ;; ------------------------------------------------------------------------------------------- Layer 0
 
@@ -112,36 +99,6 @@
         (compile-frame (repeat size :byte))))
     identity)))
 
-
-#_(defcodec byte-codes
-    (enum :ubyte {;; Opcodes
-                  :AUX                (hex->int :0xFA)
-                  :RESIZEDB           (hex->int :0xFB)
-                  :EXPIRETIMEMS       (hex->int :0xFC)
-                  :EXPIRETIME         (hex->int :0xFD)
-                  :SELECTDB           (hex->int :0xFE)
-                  :EOF                (hex->int :0xFF)
-
-                  ;; values
-                  :string             0
-                  :list               1
-                  :set                2
-                  :sorted-set         3
-                  :hashmap            4
-                  :zset2              5
-                  :zipmap             9
-                  :ziplist            10
-                  :intset             11
-                  :ziplist-sorted-set 12
-                  :ziplist-hashmap    13
-                  :quicklist          14
-                  :stream-listpacks   15
-
-                  ;; expirytime
-                  :seconds            (hex->int :0xFD)
-                  :milliseconds       (hex->int :0xFC)}))
-
-
 (defcodec byte-codes
   (enum :ubyte
         {:RDB_TYPE_STRING                  0
@@ -149,10 +106,10 @@
          :RDB_TYPE_SET                     2
          :RDB_TYPE_ZSET                    3
          :RDB_TYPE_HASH                    4
-         :RDB_TYPE_ZSET_2                  5 ;; ZSET version 2 with doubles stored in binary. */
-         :RDB_TYPE_MODULE_PRE_GA           6 ;; Used in 4.0 release candidates */
-         :RDB_TYPE_MODULE_2                7 ;; Module value with annotations for parsing without
-                    ;; the generating module being loaded. */
+         :RDB_TYPE_ZSET_2                  5  ;; ZSET version 2 with doubles stored in binary.
+         :RDB_TYPE_MODULE_PRE_GA           6  ;; Used in 4.0 release candidates
+         :RDB_TYPE_MODULE_2                7  ;; Module value with annotations for parsing without
+                                              ;; the generating module being loaded.
          :RDB_TYPE_HASH_ZIPMAP             9
          :RDB_TYPE_LIST_ZIPLIST            10
          :RDB_TYPE_SET_INTSET              11
@@ -166,25 +123,24 @@
          :RDB_TYPE_STREAM_LISTPACKS_2      19
          :RDB_TYPE_SET_LISTPACK            20
          :RDB_TYPE_STREAM_LISTPACKS_3      21
-         :RDB_TYPE_HASH_METADATA_PRE_GA    22   ;; Hash with HFEs. Doesn't attach min TTL at start (7.4 RC) */
-         :RDB_TYPE_HASH_LISTPACK_EX_PRE_GA 23   ;; Hash LP with HFEs. Doesn't attach min TTL at start (7.4 RC) */
-         :RDB_TYPE_HASH_METADATA           24             ;; Hash with HFEs. Attach min TTL at start */
-         :RDB_TYPE_HASH_LISTPACK_EX        25          ;; Hash LP with HFEs. Attach min TTL at start */
-;; NOTE: WHEN ADDING NEW RDB TYPE, UPDATE rdbIsObjectType(), and rdb_type_string[] */
-
-;; Special RDB opcodes (saved/loaded with rdbSaveType/rdbLoadType). */
-         :RDB_OPCODE_SLOT_INFO             244   ;; Individual slot info, such as slot id and size (cluster mode only). */
-         :RDB_OPCODE_FUNCTION2             245   ;; function library data */
-         :RDB_OPCODE_FUNCTION_PRE_GA       246   ;; old function library data for 7.0 rc1 and rc2 */
-         :RDB_OPCODE_MODULE_AUX            247   ;; Module auxiliary data. */
-         :RDB_OPCODE_IDLE                  248   ;; LRU idle time. */
-         :RDB_OPCODE_FREQ                  249   ;; LFU frequency. */
-         :RDB_OPCODE_AUX                   250   ;; RDB aux field. */
-         :RDB_OPCODE_RESIZEDB              251   ;; Hash table resize hint. */
-         :RDB_OPCODE_EXPIRETIME_MS         252    ;; Expire time in milliseconds. */
-         :RDB_OPCODE_EXPIRETIME            253       ;; Old expire time in seconds. */
-         :RDB_OPCODE_SELECTDB              254   ;; DB number of the following keys. */
-         :RDB_OPCODE_EOF                   255   ;; End of the RDB file. */
+         :RDB_TYPE_HASH_METADATA_PRE_GA    22   ;; Hash with HFEs. Doesn't attach min TTL at start (7.4 RC)
+         :RDB_TYPE_HASH_LISTPACK_EX_PRE_GA 23   ;; Hash LP with HFEs. Doesn't attach min TTL at start (7.4 RC)
+         :RDB_TYPE_HASH_METADATA           24   ;; Hash with HFEs. Attach min TTL at start
+         :RDB_TYPE_HASH_LISTPACK_EX        25   ;; Hash LP with HFEs. Attach min TTL at start
+         
+;; Special RDB opcodes
+         :RDB_OPCODE_SLOT_INFO             244   ;; Individual slot info, such as slot id and size (cluster mode only).
+         :RDB_OPCODE_FUNCTION2             245   ;; function library data
+         :RDB_OPCODE_FUNCTION_PRE_GA       246   ;; old function library data for 7.0 rc1 and rc2
+         :RDB_OPCODE_MODULE_AUX            247   ;; Module auxiliary data.
+         :RDB_OPCODE_IDLE                  248   ;; LRU idle time.
+         :RDB_OPCODE_FREQ                  249   ;; LFU frequency.
+         :RDB_OPCODE_AUX                   250   ;; RDB aux field.
+         :RDB_OPCODE_RESIZEDB              251   ;; Hash table resize hint.
+         :RDB_OPCODE_EXPIRETIME_MS         252   ;; Expire time in milliseconds.
+         :RDB_OPCODE_EXPIRETIME            253   ;; Old expire time in seconds.
+         :RDB_OPCODE_SELECTDB              254   ;; DB number of the following keys.
+         :RDB_OPCODE_EOF                   255   ;; End of the RDB file.
          }))
 
 (defn parse-header-byte []
@@ -205,9 +161,9 @@
    (fn [header]
      (log/trace ::scored-value-encoding {:header header})
      (condp = header
-       (hex->int :0xFD) (value-parser :nan)
-       (hex->int :0xFE) (value-parser :pos-infinity)
-       (hex->int :0xFF) (value-parser :neg-infinity)
+       0xFD (value-parser :nan)
+       0xFE (value-parser :pos-infinity)
+       0xFF (value-parser :neg-infinity)
        (gloss/string-float :ascii :length header)))
    identity))
 
@@ -456,13 +412,6 @@
      :RDB_TYPE_SET_LISTPACK            (parse-set-listpacks)
      :RDB_TYPE_STREAM_LISTPACKS_3      (parse-stream-listpack-3)
      (throw (ex-info "Unknown kind" {:kind kind})))))
-
-
-(defn is-expiry? [bits]
-  (condp = header
-    (hex->int :0xFC) true
-    (hex->int :0xFD) true
-    false))
 
 (defn parse-expiry [kind]
   (compile-frame
