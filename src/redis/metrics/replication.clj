@@ -22,5 +22,14 @@
 (defn update-role! [role]
   (state/set-metric! [:replication :role] role))
 
+(defn add-replica [{:keys [id host port stream]}]
+  (state/update-metric! [:replication :replicas] 
+                        (fnil merge {}) 
+                        {id {:host host :port port :stream stream}}))
+
+(defn remove-replica [id]
+  (state/update-metric! [:replication :replicas] dissoc id))
+
+
 (defn get-replication-metrics []
   (state/get-section :replication))

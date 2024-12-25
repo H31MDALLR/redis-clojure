@@ -39,7 +39,7 @@
 
 (defn coll->resp2-array [coll]
   (->> coll
-       (map (fn [element] {:bulk-string element}))
+       (map (fn [element] {:bulk-string (str element)}))
        array))
 
 
@@ -55,5 +55,7 @@
   (encode-resp {:array [{:integer 1}
                         {:bulk-string "hello"}
                         {:simple-string "world"}]})
+  
+  (coll->resp2-array ["SomeString" 100])
 
   "Leave this here.")

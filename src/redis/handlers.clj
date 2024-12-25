@@ -60,9 +60,9 @@
 
 (defn handle-connection [socket info]
   (log/info ::handle-connection {:connection info})
-  (let [session-id  (.get-or-create! session/sm (hash info))
-        client-id   (str session-id)
-        client-info {:id       client-id
+  (let [fingerprint (hash info)
+        session-id  (.get-or-create! session/sm fingerprint)
+        client-info {:id       fingerprint
                      :addr     (:remote-addr info)
                      :port     (:server-port info)
                      :name     nil
@@ -78,11 +78,10 @@
     (client-metrics/record-client-connection! client-info)
 
     ;; Add cleanup on socket close
-    (s/on-closed socket #(client-metrics/record-client-disconnection! client-id))
+    (s/on-closed socket #(client-metrics/record-client-disconnection! session-id))
     
     (let [context {:connection-info info
                    :session-id      session-id
-                   :client-id       client-id
                    :socket          socket}]
       (s/consume
        (fn [raw-message]
@@ -102,6 +101,8 @@
 (comment
   (do
     (log/set-min-level! :trace)
+    (.get-or-create! session/sm (hash {:test "test"}))
+    (.get-item! session/sm :3a2c2455-fa92-4efe-a3e6-c54831f60926 [:db])
 
     (def set-command "*7\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$4\r\ntest\r\n$2\r\nPX\r\n$2\r\nNX\r\n$7\r\nKEEPTTL\r\n$3\r\nGET\r\n")
     (def docs-command "*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n")

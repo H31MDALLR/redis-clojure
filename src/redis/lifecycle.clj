@@ -53,7 +53,7 @@
     (handlers/handle-connection socket info)))
 
 ;; -------------------------------------------------------- Persistence
-(defmethod ig/init-key :redis/config [_ opts]
+(defmethod ig/init-key :redis/config [_ {:keys [port] :as opts}]
   (log/trace ::init-key :redis/config opts)
   (let [service-config (-> @cli-opts :options)
         config-db      (merge opts service-config)]
@@ -65,9 +65,10 @@
     (if (seq config-db)
       (let [{:keys [dir dbfilename replicaof]} config-db 
             path (str dir "/" dbfilename)
-            database       (deserialize/rdb-file->database path)]
+            database       (deserialize/rdb-file->database path)
+            replica-port (or (-> @cli-opts :options :port) port)]
         (storage/add-db (:id database) database)
-        (replication/initialize-replication! replicaof))
+        (replication/initialize-replication! replicaof replica-port))
 
       ;; create an empty database at id 0 if no config passed.
       (storage/add-db 0 (deserialize/empty-db 0)))
