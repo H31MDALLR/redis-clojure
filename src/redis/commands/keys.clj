@@ -11,7 +11,7 @@
 
 (defn impl-keys [command-info session-id]
   (let [{:keys [defaults]} command-info
-        db (.get-item! session/sm session-id [:db])
+        db (.get-item session/sm session-id [:db])
         matches (storage/find-keys db (first defaults))]
     (log/trace ::keys-cmd {:matches matches})
     matches))

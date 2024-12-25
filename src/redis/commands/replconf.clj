@@ -6,48 +6,72 @@
    [redis.metrics.state :as state]
    [redis.replication :as replication]
    [redis.session :as session]
+   [redis.utils :as utils]
    [taoensso.timbre :as log]))
 
-(defmulti impl-replconf (fn [ctx] (-> ctx :command-info :defaults first)))
+(defmulti impl-replconf (fn [ctx] (-> ctx :command-info :defaults first utils/keywordize)))
 
-(defmethod impl-replconf :listeningport
+(defmethod impl-replconf :listening-port
   [{:keys [command-info session-id]
     :as   ctx}]
   (log/info ::impl-replconf {:command-info command-info
                              :session-id   session-id})
-  (let [port (-> command-info :args first)]
+  (let [[_ port] (-> command-info :defaults)]
 
   ;; store the listening port in the session
     (.add-item! session/sm session-id [:listening-port] port)
-    (resp2/ok)))
+    (assoc ctx :response (resp2/ok))))
 
 (defmethod impl-replconf :capa
   [{:keys [command-info session-id]
     :as   ctx}]
   (log/info ::impl-replconf {:command-info command-info
                              :session-id   session-id})
-  (let [arg          (-> command-info :args first)
+  (let [[_ psync-arg]          (-> command-info :defaults)
         replica-port (.get-item session/sm session-id [:listening-port])
         fingerprint  (.get-item session/sm session-id [:fingerprint])
         replica-info (state/get-metric [:clients :client_infos fingerprint])]
-    (if (contains? #{"psync2"} arg)
+    (if (contains? #{"psync2"} psync-arg)
       ;; setup streaming data to the replica in another thread
       (let [stream       (replication/replicate-to replica-port replica-info)
             replica-info (assoc replica-info :stream stream)]
         (replication-metrics/update-connected-slaves! inc)
         (replication-metrics/add-replica replica-info)
-        (resp2/ok))
-      (resp2/error "ERR unknown option"))))
+        (assoc ctx :response (resp2/ok)))
+      (assoc ctx :response (resp2/error "ERR unknown option")))))
 
-(defmethod impl-replconf :default
+ (defmethod impl-replconf :default
   [{:keys [command-info session-id]
     :as   ctx}]
   (log/info ::impl-replconf {:command-info command-info
                              :session-id session-id})
-  (resp2/error "ERR unknown option"))
+  (assoc ctx :response (resp2/error "ERR unknown option")))
 
 ;; ------------------------------------------------------------------------------------------- Dispatch
 
 (defmethod dispatch/command-dispatch :replconf
   [ctx]
   (impl-replconf ctx))
+
+
+;; ------------------------------------------------------------------------------------------- REPLCONF
+
+(comment
+  (def impl-replconf nil)
+  (-> {:command-info {:command :replconf,
+                       :defaults ["capa" "psync2"],
+                       :options {}}
+       :session-id   :8637727d-f641-4032-807a-e945a3e9b0e8
+       :parse-result ["REPLCONF" "listening-port" "6379"]}
+      :command-info :defaults first utils/keywordize)
+  
+  (impl-replconf {:command-info {:defaults ["listening-port" "6379"]}
+                  :session-id   :8637727d-f641-4032-807a-e945a3e9b0e8
+                  :parse-result ["REPLCONF" "listening-port" "6379"]})
+  (impl-replconf {:command-info {:command :replconf, 
+                                 :defaults ["capa" "psync2"], 
+                                 :options {}}, 
+                  :session-id :8637727d-f641-4032-807a-e945a3e9b0e8})
+
+  
+  ::leave-this-here)

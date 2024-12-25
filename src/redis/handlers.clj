@@ -13,6 +13,7 @@
    [redis.commands.keys]
    [redis.commands.info]
    [redis.commands.ping]
+   [redis.commands.replconf]
    [redis.commands.set]
    [redis.decoder :as decoder]
    [redis.encoding.resp2 :as resp2]
@@ -102,7 +103,7 @@
   (do
     (log/set-min-level! :trace)
     (.get-or-create! session/sm (hash {:test "test"}))
-    (.get-item! session/sm :3a2c2455-fa92-4efe-a3e6-c54831f60926 [:db])
+    (.get-item session/sm :3a2c2455-fa92-4efe-a3e6-c54831f60926 [:db])
 
     (def set-command "*7\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$4\r\ntest\r\n$2\r\nPX\r\n$2\r\nNX\r\n$7\r\nKEEPTTL\r\n$3\r\nGET\r\n")
     (def docs-command "*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n")
@@ -110,7 +111,8 @@
     (def set-banana "*5\r\n$3\r\nSET\r\n$6\r\nbanana\r\n$5\r\napple\r\n$2\r\npx\r\n$3\r\n100\r\n")
     (def get-banana  "*2\r\n$3\r\nGET\r\n$6\r\nbanana\r\n")
     (def ping-command "*1\r\n$4\r\nPING\r\n")
-    (def echo-command "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n"))
+    (def echo-command "*2\r\n$4\r\nECHO\r\n$6\r\nbanana\r\n")
+    (def replconf-command "*3\r\n$7\r\nREPLCONF\r\n$7\r\nlistening-port\r\n$5\r\n6379\r\n"))
 
   
   (let [info        {:remote-addr "127.0.0.1"
@@ -118,7 +120,7 @@
                      :server-port 6379
                      :server-name "localhost"}
         fingerprint (hash info)
-        context     {:message    docs-command
+        context     {:message    replconf-command
                      :session-id (.get-or-create! session/sm fingerprint)}]
     (handler context))
   

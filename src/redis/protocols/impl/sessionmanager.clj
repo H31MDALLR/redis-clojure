@@ -40,7 +40,7 @@
         updated (update-in session (butlast path) dissoc (last path))]
     (.store-session store id updated)))
 
-(defn get-item! [store id path]
+(defn get-item [store id path]
   (get-in (.retrieve-session store id) path))
 
 (defn update-item! [store id path f]

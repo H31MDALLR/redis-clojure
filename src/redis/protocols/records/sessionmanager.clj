@@ -19,5 +19,5 @@
 
   (add-item! [_ id path v] (impl/add-item! store id path v))
   (delete-item! [_ id path] (impl/delete-item! store id path))
-  (get-item! [_ id path] (impl/get-item! store id path)) 
+  (get-item [_ id path] (impl/get-item store id path)) 
   (update-item! [_ id path f] (impl/update-item! store id path f)))

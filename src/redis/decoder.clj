@@ -66,6 +66,10 @@
   [ctx]
  (options/parse-result->command ctx 1))
 
+(defmethod decode :replconf
+  [ctx]
+  (options/parse-result->command ctx 2))
+
 (defmethod decode :set
    [ctx]
  (options/parse-result->command ctx 2))
@@ -82,6 +86,7 @@
   (do
     (log/set-min-level! :trace)
 
+    (def replconf-command "*3\r\n$7\r\nREPLCONF\r\n$7\r\nlistening-port\r\n$5\r\n6379\r\n")
     (def set-command "*7\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$4\r\ntest\r\n$2\r\nPX\r\n$2\r\nNX\r\n$7\r\nKEEPTTL\r\n$3\r\nGET\r\n")
     (def docs-command ["*2\r\n$7\r\nCOMMAND\r\n$4\r\nDOCS\r\n" '("COMMAND" "DOCS")])
     (def get-command "*3\r\n$3\r\nSET\r\n$5\r\nmykey\r\n$6\r\nHello!\r\n")
