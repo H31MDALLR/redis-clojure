@@ -13,6 +13,7 @@
    [redis.commands.keys]
    [redis.commands.info]
    [redis.commands.ping]
+   [redis.commands.psync]
    [redis.commands.replconf]
    [redis.commands.set]
    [redis.decoder :as decoder]

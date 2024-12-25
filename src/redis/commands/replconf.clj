@@ -11,17 +11,6 @@
 
 (defmulti impl-replconf (fn [ctx] (-> ctx :command-info :defaults first utils/keywordize)))
 
-(defmethod impl-replconf :listening-port
-  [{:keys [command-info session-id]
-    :as   ctx}]
-  (log/info ::impl-replconf {:command-info command-info
-                             :session-id   session-id})
-  (let [[_ port] (-> command-info :defaults)]
-
-  ;; store the listening port in the session
-    (.add-item! session/sm session-id [:listening-port] port)
-    (assoc ctx :response (resp2/ok))))
-
 (defmethod impl-replconf :capa
   [{:keys [command-info session-id]
     :as   ctx}]
@@ -40,12 +29,23 @@
         (assoc ctx :response (resp2/ok)))
       (assoc ctx :response (resp2/error "ERR unknown option")))))
 
+(defmethod impl-replconf :listening-port
+  [{:keys [command-info session-id]
+    :as   ctx}]
+  (log/info ::impl-replconf {:command-info command-info
+                             :session-id   session-id})
+  (let [[_ port] (-> command-info :defaults)]
+
+  ;; store the listening port in the session
+    (.add-item! session/sm session-id [:listening-port] port)
+    (assoc ctx :response (resp2/ok))))
+
  (defmethod impl-replconf :default
   [{:keys [command-info session-id]
     :as   ctx}]
   (log/info ::impl-replconf {:command-info command-info
                              :session-id session-id})
-  (assoc ctx :response (resp2/error "ERR unknown option")))
+  (assoc ctx :response (resp2/error "ERR unknown REPLCONF option")))
 
 ;; ------------------------------------------------------------------------------------------- Dispatch
 

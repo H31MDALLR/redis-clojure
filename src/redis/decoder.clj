@@ -66,6 +66,10 @@
   [ctx]
  (options/parse-result->command ctx 1))
 
+(defmethod decode :psync
+  [ctx]
+ (options/parse-result->command ctx 2))
+
 (defmethod decode :replconf
   [ctx]
   (options/parse-result->command ctx 2))
