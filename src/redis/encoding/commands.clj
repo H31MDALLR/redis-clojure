@@ -7,15 +7,15 @@
   []
   (resp2/coll->resp2-array ["PING"]))
 
+(defn psync
+  "Encode a PSYNC command"
+  [replication-id offset]
+  (resp2/coll->resp2-array ["PSYNC" replication-id offset]))
+
 (defn replconf
   "Encode a REPLCONF command"
   [option value]
   (resp2/coll->resp2-array ["REPLCONF" option value]))
-
-(defn psync 
-  "Encode a PSYNC command"
-  [offset run-id]
-  (resp2/coll->resp2-array ["PSYNC" offset run-id]))
 
 (defn sync 
   "Encode a SYNC command"

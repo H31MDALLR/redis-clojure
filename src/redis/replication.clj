@@ -137,6 +137,7 @@
       (s/take! socket ::none)                     ;; returns Deferred<ByteBuf or String or ...>
       #(check-and-continue % '([:SimpleString "PONG"]) socket (encoding/replconf "listening-port" recieve-port))
       #(check-and-continue % '([:SimpleString "OK"]) socket (encoding/replconf "capa" "psync2"))
+      #(check-and-continue % '([:SimpleString "OK"]) socket (encoding/psync "?" "-1"))
       #(check-and-close % '([:SimpleString "OK"]) socket)))
    (d/catch
     Exception
