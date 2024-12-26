@@ -49,7 +49,7 @@
 
 ; --------------------------------------------------------- RDB parser streams
 (defn body-stream [buffer]
-  (gio/lazy-decode-all schema/section-selector buffer))
+  (gio/lazy-decode-all (schema/parse-section-selector) buffer))
 
 
 (defn header-stream [db]
@@ -114,11 +114,28 @@
 ; ----------------------------------------------------------------------------- REPL
 
 (comment
+
   (-> "resources/test/rdb/dump.rdb"
       parse-rdb-file
       second
       transform/transform-data)
-  (rdb-file->database "resources/test/rdb/dump.rdb")
+
+  (defn parse-rdb-file-ex 
+    [db-path]
+    (let [db                        (load-rdb-file db-path)
+          decoder-ring-magic-header (header-stream db)
+          header                    (synchronous-take! decoder-ring-magic-header)
+          buffer                    (synchronous-take! decoder-ring-magic-header)
+          section-reader            (body-stream buffer)
+          parsed-output             (deserialize section-reader)]
+      (conj [header] parsed-output)))
+
+  ;; parse-rdb-file-ex is a version of parse-rdb-file
+  ;; that does not transform the data
+  (->> "resources/test/rdb/dump.rdb"
+       parse-rdb-file-ex)
+
+  (parse-rdb-file "resources/test/rdb/dump.rdb")
 
   (do
     (require '[java-time.api :as jt]
@@ -126,12 +143,12 @@
              '[redis.utils :as utils])
     (def sample-expiry-db [{:type :aux
                             :k    [114 101 100 105 115 45 118 101 114]
-                            :v    [55 46 50 46 48]} 
+                            :v    [55 46 50 46 48]}
                            {:type :aux
                             :k    [114 101 100 105 115 45 98 105 116 115]
-                            :v    [64]} 
+                            :v    [64]}
                            {:type      :selectdb
-                            :db-number {:size 0}} 
+                            :db-number {:size 0}}
                            {:type                   :resizdb-info
                             :db-hash-table-size     {:size 3}
                             :expiry-hash-table-size {:size 3}}
@@ -141,14 +158,14 @@
                                      :unit   :milliseconds}
                             :kind   :RDB_TYPE_STRING
                             :k      [109 97 110 103 111]
-                            :v      [97 112 112 108 101]} 
+                            :v      [97 112 112 108 101]}
                            {:type   :key-value
                             :expiry {:expiry 3422276229857280N
                                      :type   :expiry-ms
                                      :unit   :milliseconds}
                             :kind   :RDB_TYPE_STRING
                             :k      [98 108 117 101 98 101 114 114 121]
-                            :v      [112 101 97 114]} 
+                            :v      [112 101 97 114]}
                            {:type   :key-value
                             :expiry {:expiry 3422276229857280N
                                      :type   :expiry-ms
@@ -161,67 +178,26 @@
         (utils/apply-f-to-key :k binary-array->string)
         ;time/expired?
         ))
-  (do 
-    (require '[java-time.api :as jt]
+  
+  (do
+    (require '[clojure.edn :as edn]
+             '[java-time.api :as jt]
              '[redis.time :as time]
              '[redis.utils :as utils])
-    (def sample-db [{:type :aux
-                     :k    [114 101 100 105 115 45 118 101 114]
-                     :v    [55 46 50 46 48]} 
-                    {:type :aux
-                     :k    [114 101 100 105 115 45 98 105 116 115]
-                     :v    [64]} 
-                    {:type      :selectdb
-                     :db-number {:size 0}} 
-                    {:type                   :resizdb-info
-                     :db-hash-table-size     {:size 5}
-                     :expiry-hash-table-size {:size 5}}
-                    {:type   :key-value
-                     :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
-                              :timestamp 1956528000000N
-                              :unit      :milliseconds}
-                     :kind   :RDB_TYPE_STRING
-                     :k      [115 116 114 97 119 98 101 114 114 121]
-                     :v      [98 108 117 101 98 101 114 114 121]} 
-                    {:type   :key-value
-                     :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
-                              :timestamp 1640995200000N
-                              :unit      :milliseconds}
-                     :kind   :RDB_TYPE_STRING
-                     :k      [112 101 97 114]
-                     :v      [103 114 97 112 101]}
-                    {:type   :key-value
-                     :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
-                              :timestamp 1956528000000N
-                              :unit      :milliseconds}
-                     :kind   :RDB_TYPE_STRING
-                     :k      [111 114 97 110 103 101]
-                     :v      [114 97 115 112 98 101 114 114 121]}
-                    {:type   :key-value
-                     :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
-                              :timestamp 1956528000000N
-                              :unit      :milliseconds}
-                     :kind   :RDB_TYPE_STRING
-                     :k      [109 97 110 103 111]
-                     :v      [109 97 110 103 111]} 
-                    {:type   :key-value
-                     :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
-                              :timestamp 1956528000000N
-                              :unit      :milliseconds}
-                     :kind   :RDB_TYPE_STRING
-                     :k      [98 108 117 101 98 101 114 114 121]
-                     :v      [98 97 110 97 110 97]}])
+    (def sample-db (-> "test/db/deserialized.edn"
+                       io/resource
+                       slurp
+                       edn/read-string))
     (-> sample-db
         (apply-f-to-key :k (comp keyword binary-array->string))
         transform/transform-data
         :database
         :strawberry
         :expiry
-        time/expired?
-        ))
-  
+        time/expired?))
+
   (-> (jt/instant 44172959069306880N)
       time/expired?)
-  
+
   ::leave-this-here
   )

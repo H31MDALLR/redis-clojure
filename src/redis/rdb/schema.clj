@@ -48,35 +48,59 @@
   (log/trace ::parse-length :enter)
   (compile-frame
    (header
-    (bit-seq 2 6)
-    (fn [[kind remaining]]
-      (log/trace ::parse-length {:kind kind
-                                 :remaining remaining})
-      (case kind
-        0 (ordered-map :size remaining)
-        1 (ordered-map :size
-                       (compile-frame :ubyte
-                                      identity
-                                      (fn [v]
-                                        (log/trace ::parse-length {:kind      :14bit
-                                                                   :remaining remaining})
-                                        (bytes->integer remaining v))))
-        2 (ordered-map :size :uint32)
-        3 (ordered-map :special remaining)))
-    identity)))
+    :ubyte
+    (fn [header]
+      (let [kind      (bit-shift-right header 6)
+            remaining (bit-and header 0x3F)]
+
+        (log/trace ::parse-length {:kind      kind
+                                   :remaining remaining})
+        (case kind
+          0 (ordered-map :kind kind
+                         :size remaining)
+          1 (ordered-map :kind kind
+                         :size (compile-frame :ubyte
+                                              identity
+                                              (fn [v]
+                                                (log/trace ::parse-length {:kind      :14bit
+                                                                           :remaining remaining})
+                                                (bytes->integer remaining v))))
+          2 (ordered-map :kind kind
+                         :size :uint32)
+          3 (ordered-map :kind kind
+                         :special remaining))))
+    (fn [data]
+      (let [{:keys [kind size special]} data]
+        (case kind
+          0 (bit-or (bit-shift-left 0 6)
+                    (bit-and size 0x3F))  ;; single byte
+          1 (let [partial-len (bit-shift-right size 8)]
+              (bit-or (bit-shift-left 1 6)
+                      (bit-and partial-len 0x3F)))
+          2 (bit-or (bit-shift-left 2 6)
+                    0)  ;; partial-len=0 => actual length is in the body’s next 4 bytes
+          3 (bit-or (bit-shift-left 3 6)
+                    (bit-and special 0x3F))))))))
 
 
 (defn parse-lzf-string []
   (header
    (parse-length)
-   (fn [{:keys [size]}]
+   (fn [{:keys [kind size special]}]
      (log/trace ::parse-lzf-string :compressed-length size)
      (compile-frame (ordered-map
                      :type :lzh-string
-                     :compressed-length size
+                     :kind kind
+                     :size size
+                     :special special
                      :uncompressed-length (parse-length)
-                     :compressed-data  (compile-frame (repeat size :byte)))))
-   identity))
+                     :data (compile-frame (repeat size :byte)))))
+   (fn [data]
+     (log/trace ::parse-lzf-string {:data data})
+     (let [{:keys [kind size special]} data]
+       {:kind kind
+        :size size
+        :special special}))))
 
 
 (defn parse-string
@@ -84,20 +108,47 @@
   (compile-frame
    (header
     (parse-length)
-    (fn [{:keys [size special]
+    (fn [{:keys [kind size special]
           :as   header}]
       (log/trace ::parse-string header)
       (if special
-          ;; Special encoding
+        ;; Special encoding
         (condp = special
-          0 (compile-frame [:byte])
-          1 (compile-frame [:int16-le])
-          2 (compile-frame [:int32-le])
+          0 (compile-frame (ordered-map :type :int-string
+                                        :kind kind
+                                        :special special
+                                        :data [:byte]))
+          1 (compile-frame (ordered-map :type :int-string
+                                        :kind kind
+                                        :special special
+                                        :data [:int16-le]))
+          2 (compile-frame (ordered-map :type :int-string
+                                        :kind kind
+                                        :special special
+                                        :data [:int32-le]))
           3 (parse-lzf-string)
           (throw (Exception. (str "Unknown special encoding: " special))))
-          ;; Regular string
-        (compile-frame (repeat size :byte))))
-    identity)))
+        ;; Regular string
+        (compile-frame 
+         (ordered-map
+          :type :string
+          :kind kind
+          :special special
+          :size size
+          :data (compile-frame (repeat size :byte))))))
+    (fn [m]
+      (log/trace ::parse-string m)
+      (let [{:keys [kind size special data]
+             :as   full} m]
+        (log/trace ::parse-string {:post-let {:kind    kind
+                                              :size    size
+                                              :special special
+                                              :full    full}})
+        {:kind    (or kind 0)
+         :size    (if (number? size)
+                    size
+                    (count (or data [])))
+         :special special})))))
 
 (defcodec byte-codes
   (enum :ubyte
@@ -127,7 +178,7 @@
          :RDB_TYPE_HASH_LISTPACK_EX_PRE_GA 23   ;; Hash LP with HFEs. Doesn't attach min TTL at start (7.4 RC)
          :RDB_TYPE_HASH_METADATA           24   ;; Hash with HFEs. Attach min TTL at start
          :RDB_TYPE_HASH_LISTPACK_EX        25   ;; Hash LP with HFEs. Attach min TTL at start
-         
+
 ;; Special RDB opcodes
          :RDB_OPCODE_SLOT_INFO             244   ;; Individual slot info, such as slot id and size (cluster mode only).
          :RDB_OPCODE_FUNCTION2             245   ;; function library data
@@ -195,12 +246,17 @@
   (log/trace ::parse-set :enter)
   (header
    (parse-length)
-   (fn [{:keys [size]}]
+   (fn [{:keys [kind size]}]
      (log/trace ::parse-set {:elements size})
      (ordered-map
+      :kind kind
       :type :set
       :items (repeat size (parse-string))))
-   identity))
+   (fn [m]
+     (log/trace ::parse-set {:m m})
+     (let [{:keys [kind items]} m]
+       {:kind kind
+        :size (count items)}))))
 
 (defn parse-zset []
   (log/trace ::parse-zset :enter)
@@ -326,11 +382,11 @@
    (fn [{:keys [content metadata stream-id]}]
        ;; solely to log parsing in this foresaken structure lol.
      (log/trace ::parse-stream-listpack3 {:metadata  metadata ;; unknown at this point
-                                          :stream-id      stream-id
-                                          :content  content})
+                                          :stream-id stream-id
+                                          :content   content})
      ;; Continue with listpack parsing
      (ordered-map :type :RDB_TYPE_STREAM_LISTPACKS_3
-                  :metadata-size metadata
+                  :metadata metadata
                   :stream-id stream-id
                   :content content
                   :current-elements (parse-length)
@@ -341,7 +397,14 @@
                   :first-id :uint64-be
                   :unknown :int32-le
                   :padding :byte))
-   identity))
+   (fn [m]
+     (log/trace ::parse-stream-listpack3 {:m m})
+     (let [{:keys [metadata stream-id content]
+            :as   header} m]
+       (log/trace ::parse-stream-listpack3 {:metadata  metadata
+                                            :stream-id stream-id
+                                            :content   content})
+       header))))
 
 (defn parse-hash-listpacks
   []
@@ -425,43 +488,68 @@
                                 :timestamp :uint64-le)
      {})))
 
-(defcodec rdb-header
-  (ordered-map
-   :signature (gloss/string :ascii :length 5)
-   :version   (gloss/string :ascii :length 4)))
+(defn parse-rdb-header
+  []
+  (compile-frame
+   (ordered-map
+    :signature (gloss/string :ascii :length 5)
+    :version   (gloss/string :ascii :length 4))))
 
-(defcodec auxiliary-field
-  (ordered-map :type :aux
-               :k (parse-string)
-               :v (parse-string)))
+(defn parse-auxiliary-field
+  []
+  (compile-frame
+   (ordered-map :type :aux
+                :kind :RDB_OPCODE_AUX
+                :k (parse-string)
+                :v (parse-string))))
 
-(defcodec expiretime
-  (ordered-map :type :expiretime-ms
-               :expiry :int64
-               :next-entry ()))
+(defn parse-expiretime
+  []
+  (compile-frame
+   (ordered-map :type :expiretime-ms
+                :kind :RDB_OPCODE_EXPIRETIME_MS
+                :expiry :int64
+                :next-entry ())))
 
-(defcodec eof
+(defn parse-eof
+  []
   gloss/nil-frame)
 
-(defcodec resizedb-info
-  (ordered-map :type :resizdb-info
-               :db-hash-table-size (parse-length)
-               :expiry-hash-table-size (parse-length)))
+(defn parse-resizedb-info
+  []
+  (compile-frame
+   (ordered-map :type :resizdb-info
+                :kind :RDB_OPCODE_RESIZEDB
+                :db-hash-table-size (parse-length)
+                :expiry-hash-table-size (parse-length))))
 
-(defcodec selectdb
-  (ordered-map :type :selectdb
-               :db-number (parse-length)))
+(defn parse-selectdb
+  []
+  (compile-frame
+   (ordered-map :type :selectdb
+                :kind :RDB_OPCODE_SELECTDB
+                :db-number (parse-length))))
 
 (defn parse-key-value
   ([kind] (parse-key-value {} kind))
   ([expiry-kind kind]
-   (log/trace ::key-value {:kind        kind})
-   (compile-frame (ordered-map
-                   :type :key-value
-                   :expiry expiry-kind
-                   :kind kind
-                   :k  (parse-string)
-                   :v (value-kind->value kind)))))
+   (log/trace ::key-value {:kind kind})
+   (compile-frame 
+    (ordered-map
+     :type :key-value
+     :expiry expiry-kind
+     :kind kind
+     :k (parse-string)
+     :v (value-kind->value kind))
+    ;; Add encoding function
+    (fn [data]
+      (log/trace ::key-value-encoding {:data data})
+      (-> data
+          (assoc :type :key-value)
+          (update :kind #(or % kind))
+          (update :expiry #(or % expiry-kind))))
+    ;; For encoding, preserve the structure but ensure kind is passed through
+    identity)))
 
 (defn parse-key-value-with-expiry
   [expiry-kind]
@@ -475,22 +563,33 @@
       identity))
    identity))
 
-(defcodec section-selector
-  (header
-   (parse-header-byte)
-   (fn [header]
-     (log/trace ::section-selector {:header header})
-     (case header
-       :RDB_OPCODE_AUX auxiliary-field
-       :RDB_OPCODE_EXPIRETIME (parse-key-value-with-expiry header)
-       :RDB_OPCODE_EXPIRETIME_MS (parse-key-value-with-expiry header)
-       :RDB_OPCODE_RESIZEDB resizedb-info
-       :RDB_OPCODE_SELECTDB selectdb
-       :RDB_OPCODE_EOF gloss/nil-frame
-       (parse-key-value header)))
-   (fn [body]
-     (log/trace ::section-selector {:frame body})
-     body)))
+(defn data->opcode
+  "Convert a data structure back to its RDB opcode for serialization"
+  [data]
+  (log/trace ::data->opcode {:data data})
+  (case (:type data)
+    :aux :RDB_OPCODE_AUX
+    :selectdb :RDB_OPCODE_SELECTDB
+    :resizdb-info :RDB_OPCODE_RESIZEDB
+    :key-value (or (:expiry-type data) (:kind data))
+    (throw (ex-info "Unknown data type for serialization" {:data data}))))
+
+(defn parse-section-selector
+  []
+  (compile-frame
+   (header
+    (parse-header-byte)
+    (fn [header]
+      (log/trace ::section-selector {:header header})
+      (case header
+        :RDB_OPCODE_AUX (parse-auxiliary-field)
+        :RDB_OPCODE_EXPIRETIME (parse-key-value-with-expiry header)
+        :RDB_OPCODE_EXPIRETIME_MS (parse-key-value-with-expiry header)
+        :RDB_OPCODE_RESIZEDB (parse-resizedb-info)
+        :RDB_OPCODE_SELECTDB (parse-selectdb)
+        :RDB_OPCODE_EOF (parse-eof)
+        (parse-key-value header)))
+    data->opcode)))
 
 ; ----------------------------------------------------------------------------------- REPL
 
@@ -513,10 +612,10 @@
 
 
     (defcodec sections
-      (repeated section-selector :prefix :none :delimiters [-1]))
+      (repeated parse-section-selector :prefix :none :delimiters [-1]))
 
     (defcodec sections-debug
-      (repeated (header section-selector
+      (repeated (header parse-section-selector
                         (fn [frame]
                           (println ::sections-frame-parsed frame)
                           frame)
@@ -530,8 +629,8 @@
                        #_bs/stream-of))
 
     (defcodec test [rdb-header
-                    section-selector
-                    section-selector
+                    parse-section-selector
+                    parse-section-selector
 
                     #_(repeated section-selector :prefix :none :delimiters [-1])])
 

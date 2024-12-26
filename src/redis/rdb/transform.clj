@@ -185,108 +185,105 @@
 (comment
   (ns-unalias *ns* 'parse-value)
 
-  (def orange {:type :key-value, :expiry {:kind :RDB_OPCODE_EXPIRETIME_MS, :timestamp 1956528000000N, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k "orange", :v [114 97 115 112 98 101 114 114 121]})
-  (def blueberry {:type :key-value, :expiry {:kind :RDB_OPCODE_EXPIRETIME_MS, :timestamp 1640995200000N, :unit :milliseconds}, :kind :RDB_TYPE_STRING, :k "blueberry", :v [97 112 112 108 101]})
+  (def orange {:type   :key-value
+               :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
+                        :timestamp 1956528000000N
+                        :unit      :milliseconds}
+               :kind   :RDB_TYPE_STRING
+               :k      "orange"
+               :v      [114 97 115 112 98 101 114 114 121]})
+  (def blueberry {:type   :key-value
+                  :expiry {:kind      :RDB_OPCODE_EXPIRETIME_MS
+                           :timestamp 1640995200000N
+                           :unit      :milliseconds}
+                  :kind   :RDB_TYPE_STRING
+                  :k      "blueberry"
+                  :v      [97 112 112 108 101]})
   (transform blueberry)
   (transform orange)
   ; --------------------------------------------------------- In memory format
-
+  
   (def db-edn-format
     {0 {:id          0
         :aux         {"redis-ver"  "7.4.2"
                       "redis-bits" 64}
         :resize-info {:db-hash-table-size     15
                       :expiry-hash-table-size 0}
-        :data        {"bike:1:stats"      {:kind :RDB_TYPE_STRING
-                                           :v    "some string"}
-                      "bikes:rentable"    {:kind :RDB_TYPE_ZSET_LISTPACK
-                                           :v    {:type                :lzh-string,
-                                                  :compressed-length   54,
-                                                  :uncompressed-length {:size 70},
-                                                  :compressed-data     [26 70 0 0 0 6 0 -119 115 116 97 116 105 111 110
-                                                                        58 49 10 -12 32 -65 17 75 37 -36 4 0 9 -32 0 20
-                                                                        5 50 10 -12 -10 -128 63 -32 6 20 6 51 10 -12 109
-                                                                        63 121 97 64 41 1 9 -1]}}
-                      "718:boxster"       {:kind :RDB_TYPE_HASH_LISTPACK
-                                           :v    ["imagine a byte array"]}
-                      "race:france"       {:content {:type :lzh-string,
-                                                     :compressed-length 132,
-                                                     :uncompressed-length {:size 137}
-                                                     :flag -127
-                                                     :v ["imagine lzh string here"]},
-                                           :current-elements {:size 3},
-                                           :first-stream-len {:size 0},
-                                           :metadata 4097
-                                           :last-id 1732739449600N,
-                                           :first-id 1732739436148N,
-                                           :padding 0,
-                                           :stream-id {:ms  1732739436148N
-                                                       :seq 0N},
-                                           :type :RDB_TYPE_STREAM_LISTPACKS_3,
-                                           :unknown 50331648}}}})
+        :data        {"bike:1:stats"   {:kind :RDB_TYPE_STRING
+                                        :v    "some string"}
+                      "bikes:rentable" {:kind :RDB_TYPE_ZSET_LISTPACK
+                                        :v    {:type                :lzh-string,
+                                               :compressed-length   54,
+                                               :uncompressed-length {:size 70},
+                                               :compressed-data     [26 70 0 0 0 6 0 -119 115 116 97 116 105 111 110
+                                                                     58 49 10 -12 32 -65 17 75 37 -36 4 0 9 -32 0 20
+                                                                     5 50 10 -12 -10 -128 63 -32 6 20 6 51 10 -12 109
+                                                                     63 121 97 64 41 1 9 -1]}}
+                      "718:boxster"    {:kind :RDB_TYPE_HASH_LISTPACK
+                                        :v    ["imagine a byte array"]}
+                      "race:france"    {:content          {:type                :lzh-string,
+                                                           :compressed-length   132,
+                                                           :uncompressed-length {:size 137}
+                                                           :flag                -127
+                                                           :v                   ["imagine lzh string here"]},
+                                        :current-elements {:size 3},
+                                        :first-stream-len {:size 0},
+                                        :metadata         4097
+                                        :last-id          1732739449600N,
+                                        :first-id         1732739436148N,
+                                        :padding          0,
+                                        :stream-id        {:ms  1732739436148N
+                                                           :seq 0N},
+                                        :type             :RDB_TYPE_STREAM_LISTPACKS_3,
+                                        :unknown          50331648}}}})
 
 ; --------------------------------------------------------- Transform Debugging
-
+  
   ;; Example usage
-  (def input-data
-    [{:type :aux
-      :k    "redis-ver"
-      :v    [55 46 50 46 54]}
-     {:type :aux
-      :k    "redis-bits"
-      :v    {:int-8bit 64}}
-     {:type :aux
-      :k    "ctime"
-      :v    {:int-32bit 1732739669}}
-     {:type :aux
-      :k    "used-mem"
-      :v    {:int-32bit 1520096}}
-     {:type :aux
-      :k    "aof-base"
-      :v    {:int-8bit 0}}
-     {:type      :selectdb
-      :db-number {:size 0}}
-     {:type                   :resizdb-info
-      :db-hash-table-size     {:size 15}
-      :expiry-hash-table-size {:size 0}}
-     {:type   :key-value
-      :expiry {}
-      :kind   :RDB_TYPE_STRING
-      :k      "bike:1:stats"
-      :v      [0 0 3 -74 0 0 0 1]}
-     {:type   :key-value
-      :expiry {}
-      :kind   :RDB_TYPE_STRING
-      :k      "intvalue"
-      :v      [50 44 49 52 55 44 52 56 51 44 54 52 55]}])
-
+  (do
+    (require '[clojure.edn :as edn]
+             '[clojure.java.io :as io]
+             '[java-time.api :as jt]
+             '[redis.time :as time]
+             '[redis.utils :as utils])
+    (def input-data (-> "test/db/deserialized.edn"
+                        io/resource
+                        slurp
+                        edn/read-string)))
+  
   (def transformed-data
     (transform-data input-data))
 
-  (transform {:type   :key-value,
+  (transform  {:type :key-value,
               :expiry {},
-              :kind   :RDB_TYPE_STRING,
-              :k      "bike:1:stats",
-              :v      [0 0 3 -74 0 0 0 1]})
+              :kind :RDB_TYPE_STRING,
+              :k {:type :string, :kind 0, :special nil, :size 8, :data [105 110 116 118 97 108 117 101]},
+              :v {:type :string, :kind 0, :special nil, :size 13, :data [50 44 49 52 55 44 52 56 51 44 54 52 55]}}
+)
 
 ;; Print the transformed data
   (map  transform input-data)
 
-  (def aux-values [{:type :aux
-                    :k    "redis-ver"
-                    :v    [55 46 50 46 54]}
-                   {:type :aux
-                    :k    "redis-bits"
-                    :v    [64]}
-                   {:type :aux
-                    :k    "ctime"
-                    :v    [1732739669]}
-                   {:type :aux
-                    :k    "used-mem"
-                    :v    [1520096]}
-                   {:type :aux
-                    :k    "aof-base"
-                    :v    [0]}])
+  (def aux-values [{:type :aux,
+                    :kind :RDB_OPCODE_AUX,
+                    :k {:type :string, :kind 0, :special nil, :size 9, :data [114 101 100 105 115 45 118 101 114]},
+                    :v {:type :string, :kind 0, :special nil, :size 5, :data [55 46 50 46 54]}}
+                   {:type :aux,
+                    :kind :RDB_OPCODE_AUX,
+                    :k {:type :string, :kind 0, :special nil, :size 10, :data [114 101 100 105 115 45 98 105 116 115]},
+                    :v {:type :int-string, :kind 3, :special 0, :data [64]}}
+                   {:type :aux,
+                    :kind :RDB_OPCODE_AUX,
+                    :k {:type :string, :kind 0, :special nil, :size 5, :data [99 116 105 109 101]},
+                    :v {:type :int-string, :kind 3, :special 2, :data [1732739669]}}
+                   {:type :aux,
+                    :kind :RDB_OPCODE_AUX,
+                    :k {:type :string, :kind 0, :special nil, :size 8, :data [117 115 101 100 45 109 101 109]},
+                    :v {:type :int-string, :kind 3, :special 2, :data [1520096]}}
+                   {:type :aux,
+                    :kind :RDB_OPCODE_AUX,
+                    :k {:type :string, :kind 0, :special nil, :size 8, :data [97 111 102 45 98 97 115 101]},
+                    :v {:type :int-string, :kind 3, :special 0, :data [0]}}])
 
   (reduce  (fn [acc curr]
              (merge-with into acc (transform curr)))
