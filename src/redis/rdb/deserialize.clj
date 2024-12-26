@@ -120,20 +120,28 @@
       second
       transform/transform-data)
 
-  (defn parse-rdb-file-ex 
-    [db-path]
-    (let [db                        (load-rdb-file db-path)
-          decoder-ring-magic-header (header-stream db)
-          header                    (synchronous-take! decoder-ring-magic-header)
-          buffer                    (synchronous-take! decoder-ring-magic-header)
-          section-reader            (body-stream buffer)
-          parsed-output             (deserialize section-reader)]
-      (conj [header] parsed-output)))
+  (do (defn parse-rdb-file-ex 
+        [db-path]
+        (let [db                        (load-rdb-file db-path)
+              decoder-ring-magic-header (header-stream db)
+              header                    (synchronous-take! decoder-ring-magic-header)
+              buffer                    (synchronous-take! decoder-ring-magic-header)
+              section-reader            (body-stream buffer)
+              parsed-output             (deserialize section-reader)]
+          (conj [header] parsed-output)))
+      
 
-  ;; parse-rdb-file-ex is a version of parse-rdb-file
-  ;; that does not transform the data
-  (->> "resources/test/rdb/dump.rdb"
-       parse-rdb-file-ex)
+      (defn parse-rdb-file->edn
+        "Parse RDB file and write the full untruncated result to an EDN file"
+        [input-path output-path]
+        (spit output-path 
+              (binding [*print-length* nil  ; Prevent truncation
+                        *print-level* nil]  ; Prevent nested structure truncation
+                (pr-str (parse-rdb-file-ex input-path)))))
+      
+      (parse-rdb-file->edn
+       "resources/test/rdb/dump.rdb"
+       "resources/test/db/deserialized.edn"))
 
   (parse-rdb-file "resources/test/rdb/dump.rdb")
 
