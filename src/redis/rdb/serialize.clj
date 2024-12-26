@@ -1,89 +1,27 @@
 (ns redis.rdb.serialize
-  (:require [clojure.java.io :as io]
-            [gloss.io :as gio]
-            [taoensso.timbre :as log]
-            [redis.rdb.schema :as schema]))
+  (:require
+   [clojure.java.io :as io]
+   [gloss.io :as gio]
+   [manifold.stream :as s]
+   [redis.rdb.schema :as schema]))
 
-;; ----------------------------------------------------------------------------------- Layer 0
-;; Helper functions
+(defn serialize->stream 
+  [parser db]
+  ;; TODO: transform db to expected parsed-output format
+  (-> db
+      (gloss.io/encode-all (parser))
+      (s/stream bytes)))
 
-(defn write-bytes!
-  "Write a sequence of bytes to an output stream"
-  [^java.io.OutputStream out bytes]
-  (.write out (byte-array bytes)))
+(defn serialize->file 
+  [parser db path]
+  (-> db
+      (serialize->stream parser)
+      (s/connect (io/output-stream path))))
 
-(defn string->bytes
-  "Convert a string to a byte array using UTF-8 encoding"
-  [s]
-  (.getBytes s "UTF-8"))
-
-;; ----------------------------------------------------------------------------------- Layer 1
-;; Basic RDB structure
-
-(defn write-magic-number!
-  "Write the REDIS magic number"
-  [out]
-  (write-bytes! out (string->bytes "REDIS")))
-
-(defn write-version!
-  "Write the RDB version"
-  [out version]
-  (write-bytes! out (string->bytes version)))
-
-(defn write-aux-field!
-  "Write an auxiliary field (key-value pair)"
-  [out k v]
-  (write-bytes! out [0xFA])  ;; AUX opcode
-  (gio/encode schema/parse-section-selector 
-              {:type :aux
-               :k (string->bytes k)
-               :v (if (number? v)
-                    [v]
-                    (string->bytes v))}
-              out))
-
-(defn write-database-header!
-  "Write the database selector and resize info"
-  [out {:keys [id resizdb-info]}]
-  ;; Write database selector
-  (write-bytes! out [0xFE])  ;; SELECTDB opcode
-  (gio/encode schema/parse-section-selector
-              {:type :selectdb
-               :db-number {:size id}}
-              out)
-  
-  ;; Write resize info
-  (write-bytes! out [0xFB])  ;; RESIZEDB opcode
-  (gio/encode schema/parse-section-selector
-              {:type :resizdb-info
-               :db-hash-table-size {:size (:db-hash-table-size resizdb-info)}
-               :expiry-hash-table-size {:size (:expiry-hash-table-size resizdb-info)}}))
-
-(defn write-eof!
-  "Write the EOF marker"
-  [out]
-  (write-bytes! out [0xFF]))  ;; EOF opcode
-
-;; ----------------------------------------------------------------------------------- Layer 2
-;; Database writing
-
-(defn write-rdb!
-  "Write a minimal empty database to an RDB file"
-  [db path]
-  (with-open [out (io/output-stream path)]
-    ;; Write header
-    (write-magic-number! out)
-    (write-version! out "0009")
-    
-    ;; Write aux fields
-    (doseq [[k v] (:aux db)]
-      (write-aux-field! out k v))
-    
-    ;; Write database header
-    (write-database-header! out db)
-    
-    ;; Write EOF
-    (write-eof! out)))
+(defn serialize->socket [parser db socket]
+  (-> db
+      (serialize->stream parser)
+      (s/connect socket)))
 
 ;; ----------------------------------------------------------------------------------- REPL
 
@@ -96,11 +34,11 @@
                     :expiry-hash-table-size 0}
      :database     {}})
   (write-rdb! empty-db "empty.rdb")
-  
 
-  (do 
-    (require '[redis.rdb.deserialize :as deserialize]) 
-    
+
+  (do
+    (require '[redis.rdb.deserialize :as deserialize])
+
     (defn parse-db [file]
       (deserialize/parse-rdb-file-ex file))
 
@@ -109,21 +47,21 @@
         (parse-db $)
         (second $)
         (gloss.io/encode-all (parser) $)))
-    
+
     (defn test-serialization [parser file index]
       (as-> file $
         (parse-db $)
         (second $)
         (get-in $ [index])
         (gloss.io/encode (parser) $)))
-    
+
     (defn test-value-serialization [parser file index]
       (as-> file $
         (deserialize/parse-rdb-file-ex $)
         (second $)
         (get-in $ [index :v])
         (gloss.io/encode (parser) $))))
-  
+
   (-> "resources/test/rdb/dump.rdb"
       parse-db
       second
@@ -148,7 +86,7 @@
             :size    10
             :data    [114 101 100 105 115 45 98 105 116 115]},
      :v    [64]}
-  
+
   #_{:type :key-value,
      :expiry {},
      :kind :RDB_TYPE_ZSET_LISTPACK,
@@ -160,7 +98,7 @@
       :special nil,
       :uncompressed-length {:kind 1, :size 70},
       :compressed-data []}}
-  
+
   #_{:type :key-value,
      :expiry {},
      :kind :RDB_TYPE_STREAM_LISTPACKS_3,
@@ -184,7 +122,7 @@
       :first-id 1732739436148N,
       :padding 0,
       :last-id 1732739449600N}}
-  
+
   #_{:type :key-value,
      :expiry {},
      :kind :RDB_TYPE_SET,
@@ -204,7 +142,7 @@
         :size 70,
         :data
         [123 ...]}]}}
-  
+
   (test-serialization schema/parse-auxiliary-field "resources/test/rdb/dump.rdb" 1)
   (test-serialization schema/parse-key-value "resources/test/rdb/dump.rdb" 9)
   (test-value-serialization schema/parse-lzf-string "resources/test/rdb/dump.rdb" 9)
@@ -214,5 +152,4 @@
   (test-serialization #(schema/parse-key-value :RDB_TYPE_SET) "resources/test/rdb/dump.rdb" 17)
   (test-serialization schema/parse-section-selector "resources/test/rdb/dump.rdb" 9)
 
-  (serialize-all schema/parse-section-selector "resources/test/rdb/dump.rdb" ) 
-  )
+  (serialize-all schema/parse-section-selector "resources/test/rdb/dump.rdb"))
