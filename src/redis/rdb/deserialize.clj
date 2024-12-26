@@ -53,7 +53,7 @@
 
 
 (defn header-stream [db]
-  (gio/decode-stream-headers db schema/rdb-header))
+  (gio/decode-stream-headers db (schema/parse-rdb-header)))
 
 ; ---------------------------------------------------------  Parsing helpers
 (defn deserialize 
