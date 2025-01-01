@@ -1,35 +1,19 @@
 (ns redis.rdb.deserialize
   (:require
-   [clojure.java.io :as io]
-   [clojure.walk :as walk]
-
    [clj-commons.byte-streams :as bs]
-   [gloss.io :as gio :refer [decode-stream-headers lazy-decode-all]]
+   [clojure.java.io :as io]
+   [gloss.io :as gio]
    [manifold.stream :as ms]
-   [taoensso.timbre :as log]
-
-   [redis.rdb.schema :as schema]
+   [redis.rdb.schema.core :as schema]
+   [redis.rdb.schema.util :as util]
    [redis.rdb.transform :as transform]
-   [redis.time :as time]))
+   [redis.time :as time]
+   [taoensso.timbre :as log]))
 
 ; ----------------------------------------------------------------------------- Layer 0
 ; No deps on anything higher in the tree.
 
 ; --------------------------------------------------------- Util fns
-
-(defn apply-f-to-key 
-  [m k f]
-  (walk/postwalk
-   (fn [x]
-     (if (and (map? x) (contains? x k))
-       (update x k f)
-       x))
-   m))
-
-
-(defn binary-array->string
-  [arr]
-  (String. (byte-array arr)  java.nio.charset.StandardCharsets/UTF_8))
 
 
 (defn empty-db
@@ -56,7 +40,7 @@
   (gio/decode-stream-headers db (schema/parse-rdb-header)))
 
 ; ---------------------------------------------------------  Parsing helpers
-(defn deserialize 
+(defn deserialize
   "Loop through a lazy stream and returns the results"
   [source]
   (loop [source source
@@ -69,12 +53,12 @@
         (recur (rest source) (conj result parsed))))))
 
 
-(defn synchronous-take! 
+(defn synchronous-take!
   [stream]
   @(ms/take! stream))
 
 
-(defn transform 
+(defn transform
   [data]
   (transform/transform-data data))
 
@@ -90,7 +74,7 @@
         buffer                    (synchronous-take! decoder-ring-magic-header)
         section-reader            (body-stream buffer)
         parsed-output             (deserialize section-reader)
-        results                   (apply-f-to-key parsed-output :k binary-array->string)]
+        results                   (util/stringize-keys parsed-output)]
     (conj [header] results)))
 
 ; ----------------------------------------------------------------------------- Layer 2
@@ -115,78 +99,54 @@
 
 (comment
 
+  (ns-unalias *ns* 'schema)
   (-> "resources/test/rdb/dump.rdb"
       parse-rdb-file
       second
       transform/transform-data)
 
-  (do (defn parse-rdb-file-ex 
-        [db-path]
-        (let [db                        (load-rdb-file db-path)
-              decoder-ring-magic-header (header-stream db)
-              header                    (synchronous-take! decoder-ring-magic-header)
-              buffer                    (synchronous-take! decoder-ring-magic-header)
-              section-reader            (body-stream buffer)
-              parsed-output             (deserialize section-reader)]
-          (conj [header] parsed-output)))
-      
-
-      (defn parse-rdb-file->edn
-        "Parse RDB file and write the full untruncated result to an EDN file"
-        [input-path output-path]
-        (spit output-path 
-              (binding [*print-length* nil  ; Prevent truncation
-                        *print-level* nil]  ; Prevent nested structure truncation
-                (pr-str (parse-rdb-file-ex input-path)))))
-      
-      (parse-rdb-file->edn
-       "resources/test/rdb/dump.rdb"
-       "resources/test/db/deserialized.edn"))
-
-  (parse-rdb-file "resources/test/rdb/dump.rdb")
-
+  ;; ------------------------------------------------------ Deserialization debugging
   (do
-    (require '[java-time.api :as jt]
-             '[redis.time :as time]
-             '[redis.utils :as utils])
-    (def sample-expiry-db [{:type :aux
-                            :k    [114 101 100 105 115 45 118 101 114]
-                            :v    [55 46 50 46 48]}
-                           {:type :aux
-                            :k    [114 101 100 105 115 45 98 105 116 115]
-                            :v    [64]}
-                           {:type      :selectdb
-                            :db-number {:size 0}}
-                           {:type                   :resizdb-info
-                            :db-hash-table-size     {:size 3}
-                            :expiry-hash-table-size {:size 3}}
-                           {:type   :key-value
-                            :expiry {:expiry 44172959069306880N
-                                     :type   :expiry-ms
-                                     :unit   :milliseconds}
-                            :kind   :RDB_TYPE_STRING
-                            :k      [109 97 110 103 111]
-                            :v      [97 112 112 108 101]}
-                           {:type   :key-value
-                            :expiry {:expiry 3422276229857280N
-                                     :type   :expiry-ms
-                                     :unit   :milliseconds}
-                            :kind   :RDB_TYPE_STRING
-                            :k      [98 108 117 101 98 101 114 114 121]
-                            :v      [112 101 97 114]}
-                           {:type   :key-value
-                            :expiry {:expiry 3422276229857280N
-                                     :type   :expiry-ms
-                                     :unit   :milliseconds}
-                            :kind   :RDB_TYPE_STRING
-                            :k      [112 101 97 114]
-                            :v      [111 114 97 110 103 101]}])
-    (-> sample-expiry-db
-        transform/transform-data
-        (utils/apply-f-to-key :k binary-array->string)
-        ;time/expired?
-        ))
+    (log/set-level! :trace)
+
+    (defn deserialize-some [db-path n]
+      (let [db                        (load-rdb-file db-path)
+            decoder-ring-magic-header (header-stream db)
+            header                    (synchronous-take! decoder-ring-magic-header)
+            buffer                    (synchronous-take! decoder-ring-magic-header)
+            section-reader            (take n (body-stream buffer))
+            parsed-output             (deserialize section-reader)]
+        [db buffer (conj [header] (util/kewordize-keys parsed-output))]))
+
+    (defn parse-rdb-file-ex
+      [db-path]
+      (let [db                        (load-rdb-file db-path)
+            decoder-ring-magic-header (header-stream db)
+            header                    (synchronous-take! decoder-ring-magic-header)
+            buffer                    (synchronous-take! decoder-ring-magic-header)
+            section-reader            (body-stream buffer)
+            parsed-output             (deserialize section-reader)]
+        (conj [header] parsed-output)))
+
+    (defn parse-rdb-file->edn
+      "Parse RDB file and write the full untruncated result to an EDN file"
+      [input-path output-path]
+      (spit output-path
+            (binding [*print-length* nil  ; Prevent truncation
+                      *print-level* nil]  ; Prevent nested structure truncation
+              (pr-str (parse-rdb-file-ex input-path))))))
+
+  (parse-rdb-file->edn
+   "resources/test/rdb/dump.rdb"
+   "resources/test/db/deserialized.edn")
   
+  (parse-rdb-file "resources/test/rdb/dump.rdb")
+  
+  (deserialize-some "resources/test/rdb/dump.rdb" 21)
+
+  (util/bytes->string (byte-array [100 111 117 98 108 101 118 97 108 117 101]))
+
+  ;; ------------------------------------------------------ Debug key expiry
   (do
     (require '[clojure.edn :as edn]
              '[java-time.api :as jt]
@@ -197,7 +157,7 @@
                        slurp
                        edn/read-string))
     (-> sample-db
-        (apply-f-to-key :k (comp keyword binary-array->string))
+        (utils/apply-f-to-key :k (comp keyword utils/binary-array->string))
         transform/transform-data
         :database
         :strawberry
@@ -207,5 +167,4 @@
   (-> (jt/instant 44172959069306880N)
       time/expired?)
 
-  ::leave-this-here
-  )
+  ::leave-this-here)

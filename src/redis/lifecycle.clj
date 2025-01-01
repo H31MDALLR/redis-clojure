@@ -67,7 +67,7 @@
             path (str dir "/" dbfilename)
             database       (deserialize/rdb-file->database path)
             replica-port (or (-> @cli-opts :options :port) port)]
-        (storage/add-db (:id database) database)
+        (storage/add-db (-> database :selectdb :id) database)
         (replication/initialize-replication! replicaof replica-port))
 
       ;; create an empty database at id 0 if no config passed.
