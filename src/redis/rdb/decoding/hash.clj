@@ -5,7 +5,7 @@
 (defmethod decode-type :hash [{:keys [type data]} _]
   (case type
     :string (into {} (map (fn [[k v]] 
-                           [(string/decode-string k) (string/decode-string v)])
+                           [(decode-storage k :bytes) (decode-storage v :bytes)])
                          (partition 2 data)))
     :listpack data  ; listpack already decoded to hash format
     :ziplist data   ; ziplist already decoded to hash format

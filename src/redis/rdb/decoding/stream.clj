@@ -22,9 +22,9 @@
 (defmethod decode-type :stream [{:keys [type data]} _]
   (case type
     :string (mapv (fn [[id timestamp value]]
-                   {:id (string/decode-string id)
-                    :timestamp (Long/parseLong (string/decode-string timestamp))
-                    :value (string/decode-string value)})
+                   {:id (decode-storage id :bytes)
+                    :timestamp (Long/parseLong (decode-storage timestamp :bytes))
+                    :value (decode-storage value :bytes)})
                  (partition 3 data))
     :listpack (decode-listpack-stream data)
     :listpack-collection (mapv decode-listpack-stream data)

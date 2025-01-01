@@ -1,11 +1,11 @@
 (ns redis.rdb.encoder
   (:require
-   [java-time.api :as jt]))
+   [java-time.api :as jt]
+   [redis.rdb.schema.util :as util]
+   [taoensso.timbre :as log]))
 
 `
 ;; ----------------------------------------------------------------------------- Defs
-(declare bytes->string)
-
 (defn value->encoding [value]
   (let [encoding-map {:RDB_OPCODE_AUX                   bytes->string
                       :RDB_OPCODE_EXPIRETIME            #(comp bytes->string jt/instant)
@@ -46,7 +46,7 @@
   (log/trace ::bytes->string {:byte-seq byte-seq})
   (when byte-seq
     (cond
-      (map? byte-seq) (bytes->string (:data byte-seq))
+      (map? byte-seq) (util/bytes->string (:data byte-seq))
       (sequential? byte-seq) (String. (byte-array byte-seq) "UTF-8")
       :else (str byte-seq))))
 

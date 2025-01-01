@@ -3,7 +3,7 @@
    [clojure.java.io :as io]
    [gloss.io :as gio]
    [manifold.stream :as s]
-   [redis.rdb.schema :as schema]))
+   [redis.rdb.schema.core :as schema]))
 
 (defn serialize->stream 
   [parser db]

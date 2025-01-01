@@ -1,8 +1,8 @@
 (ns redis.rdb.decoding.list
-  (:require [redis.rdb.decoding.string :as string]))
+  (:require [redis.rdb.decoding.core :refer [decode-storage]]))
 
 (defn decode-list [bytes]
-  (mapv string/decode-string bytes))
+  (mapv #(decode-storage % :bytes) bytes))
 
 (defn list->value [data]
   data) 
