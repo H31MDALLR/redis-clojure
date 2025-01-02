@@ -27,7 +27,7 @@
   [kind special size]
   (if (= kind :RDB_TYPE_STRING)
     (gloss/ordered-map
-     :encoding :none
+     :encoding :string
      :kind kind
      :special special
      :size size
@@ -35,7 +35,7 @@
                 (primitives/repeat-parser :byte)
                 util/bytes->string))
     (gloss/ordered-map
-     :encoding :string
+     :encoding :any
      :kind kind
      :special special
      :size size
@@ -51,7 +51,7 @@
    (fn [{:keys [kind size special]}]
      (log/trace ::parse-lzf-string :compressed-length size)
      (gloss/compile-frame (gloss/ordered-map
-                           :encoding :lzh
+                           :encoding :lzh-string
                            :kind kind
                            :size size
                            :special special

@@ -14,7 +14,7 @@
      (log/trace ::parse-set {:elements size})
      (gloss/ordered-map
       :kind kind
-      :type :set
+      :encoding :list
       :items (repeat size (string/parse-string-encoded-value))))
    (fn [m]
      (log/trace ::parse-set {:m m})

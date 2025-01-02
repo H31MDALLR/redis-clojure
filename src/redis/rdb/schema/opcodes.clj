@@ -24,6 +24,7 @@
   []
   (gloss/compile-frame
    (gloss/ordered-map
+    :kind :RDB_OPCODE_RDB_HEADER
     :signature (gloss/string :ascii :length 5)
     :version   (gloss/string :ascii :length 4))))
 
@@ -31,7 +32,6 @@
   []
   (gloss/compile-frame
    (gloss/ordered-map
-    :type :aux
     :kind :RDB_OPCODE_AUX
     :k (string/parse-string-encoded-value)
     :v (string/parse-string-encoded-value))))
@@ -40,7 +40,6 @@
   []
   (gloss/compile-frame
    (gloss/ordered-map
-    :type :resizdb-info
     :kind :RDB_OPCODE_RESIZEDB
     :db-hash-table-size (primitives/parse-length)
     :expiry-hash-table-size (primitives/parse-length))))
@@ -49,6 +48,5 @@
   []
   (gloss/compile-frame
    (gloss/ordered-map
-    :type :selectdb
     :kind :RDB_OPCODE_SELECTDB
     :db-number (primitives/parse-length))))

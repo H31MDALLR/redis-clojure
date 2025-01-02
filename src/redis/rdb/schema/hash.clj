@@ -9,7 +9,7 @@
 (defn parse-hash []
   (log/trace ::parse-hash :enter)
   (gloss/ordered-map
-   :type :hash
+   :encoding :hash
    :entries (gloss/repeated
              (gloss/ordered-map
               :k (string/parse-string-encoded-value)

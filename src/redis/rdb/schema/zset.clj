@@ -31,7 +31,7 @@
    (fn [{:keys [size]}]
      (log/trace ::parse-zset {:elements size})
      (gloss/ordered-map
-      :type :zset
+      :encoding :zset
       :entries (primitives/repeat-parser
                 size
                 (gloss/ordered-map
@@ -42,7 +42,7 @@
 
 (defn parse-zset2 []
   (gloss/ordered-map
-   :type :zset
+   :encoding :skiplist
    :entries (gloss/repeated
              (gloss/ordered-map
               :member (string/parse-string-encoded-value)

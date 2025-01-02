@@ -15,7 +15,6 @@
    [org.apache.commons.lang3.exception ExceptionUtils]))
 
 
-
 ;; state
 (def cli-opts (atom {}))
 

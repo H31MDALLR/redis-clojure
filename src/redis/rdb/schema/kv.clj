@@ -35,9 +35,9 @@
      :RDB_TYPE_HASH_LISTPACK_EX_PRE_GA (string/parse-string-encoded-value)
      :RDB_TYPE_ZSET_LISTPACK           (string/parse-string-encoded-value)
      :RDB_TYPE_LIST_QUICKLIST_2        (list/parse-list-quicklist-2)
-     :RDB_TYPE_STREAM_LISTPACKS_2      (streams/parse-stream-listpack-3-bypass)
+     :RDB_TYPE_STREAM_LISTPACKS_2      (streams/parse-stream-listpack-2)
      :RDB_TYPE_SET_LISTPACK            (string/parse-string-encoded-value)
-     :RDB_TYPE_STREAM_LISTPACKS_3      (streams/parse-stream-listpack-3-bypass)
+     :RDB_TYPE_STREAM_LISTPACKS_3      (streams/parse-stream-listpack-3)
      (throw (ex-info "Unknown kind" {:kind kind})))))
 
 (defn parse-key-value

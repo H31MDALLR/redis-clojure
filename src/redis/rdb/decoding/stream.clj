@@ -1,6 +1,5 @@
 (ns redis.rdb.decoding.stream
-  (:require [redis.rdb.decoding.core :refer [decode-storage decode-type]]
-            [redis.rdb.decoding.string :as string]))
+  (:require [redis.rdb.decoding.core :refer [decode-storage decode-type]]))
 
 (defn- decode-stream-id [ms seq]
   (str ms "-" seq))
@@ -19,8 +18,8 @@
                 :encoding encoding
                 :uncompressed-length (:uncompressed-length data)}}))
 
-(defmethod decode-type :stream [{:keys [type data]} _]
-  (case type
+(defmethod decode-type :stream [{:keys [encoding data]} _]
+  (case encoding
     :string (mapv (fn [[id timestamp value]]
                    {:id (decode-storage id :bytes)
                     :timestamp (Long/parseLong (decode-storage timestamp :bytes))
@@ -29,7 +28,7 @@
     :listpack (decode-listpack-stream data)
     :listpack-collection (mapv decode-listpack-stream data)
     (throw (ex-info "Unsupported storage type for stream"
-                   {:storage-type type}))))
+                    {:storage-type encoding}))))
 
 (defn stream->value [data]
   {:entries (mapv :fields (:entries data))

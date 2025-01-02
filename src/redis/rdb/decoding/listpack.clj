@@ -3,6 +3,10 @@
             [clojure.java.io :as io])
   (:import [java.util.zip Inflater]))
 
+
+;; Excellent treatise on listpacks
+;; https://github.com/zpoint/Redis-Internals/blob/5.0/Object/listpack/listpack.md
+
 ;; -------------------------------------------------------------------------- defs
 
 (def listpack-header-size 6)  ; Total size (4 bytes) + Number of elements (2 bytes)
@@ -138,6 +142,15 @@ Returns the decompressed data as a Clojure vector"
 ;; -------------------------------------------------------------------------- REPL
 
 (comment
+  
+;; The structure of the listpack is:
+;; <tot-bytes> <num-elements> <element-1> ... <element-N> <listpack-end-byte>
+;; Where each element is of the structure:
+;; <encoding-type><element-data><element-tot-len>.
+;; Reference: https://github.com/antirez/listpack/blob/master/listpack.md
+
+
+  
   (do
     (require '[clojure.edn :as edn]
              '[clojure.java.io :as io]
