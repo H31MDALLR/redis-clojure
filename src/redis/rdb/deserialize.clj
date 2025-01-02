@@ -74,7 +74,7 @@
         buffer                    (synchronous-take! decoder-ring-magic-header)
         section-reader            (body-stream buffer)
         parsed-output             (deserialize section-reader)
-        results                   (util/stringize-keys parsed-output)]
+        results                   (util/stringize-keys parsed-output :k [:data])]
     (conj [header] results)))
 
 ; ----------------------------------------------------------------------------- Layer 2
