@@ -2,7 +2,14 @@
   (:require [taoensso.timbre :as log]))
 
 (defmulti reverse-transform-value 
-  (fn [v] (get v :type)))
+  (fn [data]
+    (if (map? data)
+      (:type data)
+      :primitive)))
+
+(defmethod reverse-transform-value :primitive
+  [data]
+  [])  ;; Skip primitive values or handle specifically if needed
 
 (defmethod reverse-transform-value :string
   [{:keys [data encoding]}]
@@ -105,12 +112,15 @@
 (defn reverse-transform-data
   "Transform the in-memory format back to RDB format"
   [data]
-  (let [signature (when-let [sig (:signature data)]
-                   [{:signature (:signature sig)
-                     :version (:version sig)}])
-        transforms (->> (dissoc data :signature)
-                       (mapcat (fn [[k v]]
-                               (reverse-transform (assoc v :type k)))))]
+  (let [[signature & transforms] data
+        signature [{:signature (:signature signature)
+                    :version (:version signature)}]
+        transforms (->> transforms
+                        (mapcat (fn [[k v]]
+                                  (log/trace ::reverse-transform-data {:k k :v v})
+                                  (if (map? v)
+                                    (reverse-transform (assoc v :type k))
+                                    (reverse-transform v)))))]
     (vec (concat signature transforms))))
 
 ;; REPL examples
@@ -126,6 +136,12 @@
                         io/resource
                         slurp
                         edn/read-string)))
+  
+  (log/set-level! :trace)
+
+  (-> input-data
+    second
+    transform/transform-data)
   
   (-> input-data
       second
