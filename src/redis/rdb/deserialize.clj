@@ -8,7 +8,8 @@
    [redis.rdb.schema.util :as util]
    [redis.rdb.transform :as transform]
    [redis.time :as time]
-   [taoensso.timbre :as log]))
+   [taoensso.timbre :as log]
+   [manifold.stream :as s]))
 
 ; ----------------------------------------------------------------------------- Layer 0
 ; No deps on anything higher in the tree.
@@ -74,7 +75,7 @@
         buffer                    (synchronous-take! decoder-ring-magic-header)
         section-reader            (body-stream buffer)
         parsed-output             (deserialize section-reader)
-        results                   (util/stringize-keys parsed-output :k [:data])]
+        results                   (util/stringize-keys :k [:data] parsed-output)]
     (conj [header] results)))
 
 ; ----------------------------------------------------------------------------- Layer 2
@@ -133,8 +134,8 @@
       [input-path output-path]
       (spit output-path
             (binding [*print-length* nil  ; Prevent truncation
-                      *print-level* nil]  ; Prevent nested structure truncation
-              (pr-str (parse-rdb-file-ex input-path))))))
+                      *print-level*  nil]  ; Prevent nested structure truncation
+              (pr-str (parse-rdb-file input-path))))))
 
   (parse-rdb-file->edn
    "resources/test/rdb/dump.rdb"
@@ -163,8 +164,9 @@
         :strawberry
         :expiry
         time/expired?))
-
+  
   (-> (jt/instant 44172959069306880N)
       time/expired?)
 
-  ::leave-this-here)
+  ::leave-this-here
+  )

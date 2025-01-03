@@ -1,6 +1,7 @@
 (ns redis.rdb.schema.core 
   (:require
    [gloss.core :as gloss]
+   [gloss.io :as gio]
    [redis.rdb.schema.kv :as kv]
    [redis.rdb.schema.opcodes :as opcodes]
    [redis.rdb.schema.primitives :as primitives]
@@ -62,7 +63,7 @@
                                :items (string/parse-string-encoded-value)])
     
     (def kv-debug-parsers [(primitives/parse-header-byte)
-                         {:k (string/parse-string-encoded-value)}])
+                           {:k (string/parse-string-encoded-value)}])
 
     (defn compose-codecs [prev current after]
       (gloss/compile-frame (into [(opcodes/parse-rdb-header)]
@@ -79,14 +80,14 @@
        []))
 
     (try
-      (def decoder-ring-magic-header (gloss.io/decode-stream-headers test-file codecs-to-use))
+      (def decoder-ring-magic-header (gio/decode-stream-headers test-file codecs-to-use))
       (catch Exception e
         (ex-message e))))
   
   ;; retrieve our deserialized data
   (let [results @(-> decoder-ring-magic-header
                      ms/take!) 
-         codec-count (count codecs-to-use)]
+        codec-count (count codecs-to-use)]
     (->> results 
          rseq
          (take (+ 2 codec-count)) ;; window -2 before current debug codecs to ensure they are ok.
@@ -95,6 +96,8 @@
          rseq
          ))
   
+  
+  
   ;; if you need to check string data 
   (util/bytes->string (byte-array []))
 
@@ -102,11 +105,13 @@
   (require '[java-time.api :as jt])
   (map #(-> %
             :ms 
-            jt/instant)[ {:ms 14069390648618748160N, :seq 35184422486017N}
-                          {:ms 288658577569375602N, :seq 469908662704759814N}
-                          {:ms 9831480528030926953N, :seq 8029365680072516449N}])
+            jt/instant) [ {:ms 14069390648618748160N, :seq 35184422486017N}
+                         {:ms 288658577569375602N, :seq 469908662704759814N}
+                         {:ms 9831480528030926953N, :seq 8029365680072516449N}])
   
   ;; check normal timestamps
   (jt/instant 1732739436148N)
+  
 
-  ::leave-this-here)
+  ::leave-this-here
+  )

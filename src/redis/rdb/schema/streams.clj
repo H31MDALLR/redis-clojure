@@ -1,9 +1,10 @@
 (ns redis.rdb.schema.streams
   (:require
    [gloss.core :as gloss]
+   [manifold.stream :as ms]
+   [redis.rdb.schema.bytes :as bytes]
    [redis.rdb.schema.primitives :as primitives]
-   [redis.rdb.schema.string :as string]
-   [taoensso.timbre :as log]))
+   [redis.rdb.schema.string :as string]))
 
 
 ;; ---------------------------------------------------------------------------- Layer 0
@@ -15,6 +16,10 @@
   (gloss/compile-frame
    (gloss/ordered-map :ms (primitives/parse-length-prefix) ;; High 64 bits of stream ID
                       :seq (primitives/parse-length-prefix)))) ;; Low 64 bits of stream ID
+
+(defn parse-stream-id 
+  []
+  (gloss/compile-frame  [:uint64-be :uint64-be]))
 
 
 (defn parse-stream-data 
@@ -31,6 +36,12 @@
 
 ;; ---------------------------------------------------------------------------- Layer 1
 ;; Depends only on Layer 1
+(defn bytes->stream-id
+  "Full stream ids are encoded as le-strings but the actual ID is read from the raw bytes."
+  [bytes]
+  @(-> bytes
+       (bytes/get-byte-stream-parser (parse-stream-id))
+       ms/take!))
 
 (defn parse-stream-pel-entry
   [with-nacks?]
@@ -125,11 +136,11 @@
   (gloss/ordered-map
    :encoding :stream-listpack-v2
    :data (parse-stream-data)
-   :element-count (primitives/parse-length)
+   :element-count (primitives/parse-length-prefix)
    :last-stream-id (parse-metadata-stream-id)
    :first-stream-id (parse-metadata-stream-id)
    :max-tombstone-id (parse-metadata-stream-id)
-   :offset (primitives/parse-length)
+   :offset (primitives/parse-length-prefix)
    :groups (parse-stream-groups)))
 
 (defn parse-stream-listpack-3
@@ -139,26 +150,6 @@
   (parse-stream-listpack-2))
 
 
-(defn parse-stream-listpack-3-bypass
-  []
-  (let [metadata       (gloss/compile-frame [:byte :byte])
-        stream-id      (parse-metadata-stream-id)
-        data           (string/parse-string-encoded-value)
-        elements-count (primitives/parse-length-prefix)
-        last-ms        (primitives/parse-length)
-        flags          (primitives/parse-length-prefix)
-        first-ms       (primitives/parse-length)
-        unknown        [:byte :byte :byte :byte :byte]]
-    (gloss/ordered-map 
-     :metadata {:encoding       :RDB_TYPE_STREAM_LISTPACKS_3
-                :elements-count elements-count
-                :first-ms       first-ms
-                :unknown        flags
-                :metadata       metadata
-                :last-ms        last-ms
-                :stream-id      stream-id
-                :unknown-footer unknown}
-     :data           data)))
 ;; ---------------------------------------------------------------------------- REPL
 
 (comment
