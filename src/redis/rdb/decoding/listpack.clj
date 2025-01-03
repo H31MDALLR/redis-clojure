@@ -166,3 +166,25 @@ Returns the decompressed data as a Clojure vector"
   (decode-storage (-> (second input-data) (get 9) :v) ::listpack)
 
   ::leave-this-here)
+
+(defn- string->long
+  "Attempts to parse string as long, returns nil if not possible"
+  [s]
+  (try 
+    (Long/parseLong s)
+    (catch NumberFormatException _
+      nil)))
+
+(defn- string->double
+  "Attempts to parse string as double, returns nil if not possible"
+  [s]
+  (try 
+    (Double/parseDouble s)
+    (catch NumberFormatException _
+      nil)))
+
+(defn- numeric-string?
+  "Returns true if string represents a valid number"
+  [s]
+  (boolean (or (string->long s)
+               (string->double s))))

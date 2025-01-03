@@ -1,6 +1,10 @@
 (ns redis.rdb.transform
-   (:require [java-time.api :as jt]
-             [taoensso.timbre :as log]))
+  (:require
+   [clojure.edn :as edn]
+   [java-time.api :as jt]
+   [redis.rdb.schema.streams :as streams]
+   [redis.rdb.schema.util :as util]
+   [taoensso.timbre :as log]))
 
 ; ----------------------------------------------------------------------------- Defs
 
@@ -16,19 +20,15 @@
       (sequential? byte-seq) (String. (byte-array byte-seq) "UTF-8")
       :else (str byte-seq))))
 
-; ----------------------------------------------------------------------------- Layer 1
-;; only deps on layer 0
 
 ; --------------------------------------------------------- Value parsing
 
 (defmulti parse-value (fn [kind _] kind))
 (defmethod parse-value :aux
-  [_ v]
-  {:type :string
-   :data (if (> (count v) 1)
-           (bytes->string v)
-           (get v 0))
-   :encoding (if (number? (get v 0)) :int :string)})
+  [_ {:keys [data]}]
+  (condp = (count data) 
+    1 (get data 0)
+    (util/parse-stringized-value data)))
 
 (defmethod parse-value :RDB_OPCODE_EXPIRETIME
   [_ v]
@@ -39,20 +39,13 @@
   (when (number? v) (jt/instant v)))
 
 (defmethod parse-value :RDB_TYPE_STRING
-  [_ v]
-  (cond
-    (map? v) 
-    (if (= (:type v) :int-string)
-      {:type :string
-       :data (first (:data v))
-       :encoding :int}
-      {:type :string
-       :data (bytes->string (:data v))
-       :encoding :raw})
-    :else 
-    {:type :string
-     :data (bytes->string v)
-     :encoding :raw}))
+  [_ {:keys [data]
+      :as   value}]
+  (log/trace ::parse-value :RDB_TYPE_STRING {:data data}
+             :value value)
+  (if (= (:type value) :int-string)
+    (first data)
+    (util/parse-stringized-value data)))
 
 (defmethod parse-value :RDB_TYPE_LIST
   [_ v]
@@ -66,12 +59,10 @@
   [_ v]
   (when-let [items (get-in v [:items])]
     {:type :set
-     :encoding :raw
-     :items (mapv (fn [item]
-                   {:type :string
-                    :data (bytes->string (:data item))
-                    :encoding :raw}) 
-                 items)}))
+     :encoding :string
+     :items (into #{} 
+                  (map #(edn/read-string (bytes->string (:data %))))
+                  items)}))
 
 (defmethod parse-value :RDB_TYPE_HASH
   [_ v]
@@ -135,24 +126,28 @@
   v)
 
 (defmethod parse-value :RDB_TYPE_STREAM_LISTPACKS_2
-  [_ v]
-  v)
+  [_ {:keys [data]
+      :as   v}]
+  (log/trace ::parse-value 
+             :RDB_TYPE_STREAM_LISTPACKS_2 {:data data}
+             :v v)
+  (for [{:keys [stream-id listpack]} data]
+    {:type     :stream
+     :encoding :listpack-v2
+     :metadata (select-keys v [:element-count
+                               :first-stream-id
+                               :last-stream-id 
+                               :max-tombstone-id 
+                               :offset 
+                               :groups])
+     :stream   {:id   (streams/bytes->stream-id (:data stream-id))
+                :data (:data listpack)}}))
+
 
 (defmethod parse-value :RDB_TYPE_STREAM_LISTPACKS_3
   [_ v]
-  (when (map? v)
-    {:type :stream
-     :encoding :listpack-v3
-     :metadata {:size (:metadata-size v)
-               :first-stream-len (:first-stream-len v)
-               :last-id (:last-id v)
-               :first-id (:first-id v)
-               :padding (:padding v)
-               :stream-id (:stream-id v)
-               :unknown (:unknown v)}
-     :content {:compressed-length (:size (:content v))
-               :uncompressed-length (get-in v [:content :uncompressed-length :size])
-               :compressed-data (get-in v [:content :data])}}))
+  ;; for now, just use the same parsing logic as the previous version
+  (parse-value :RDB_TYPE_STREAM_LISTPACKS_2 v))
 
 (defmethod parse-value :RDB_TYPE_SET_LISTPACK
   [_ v]
@@ -175,7 +170,7 @@
   v)
 
 (defmethod parse-value :default
-  [_ _] 
+  [_ _]
   (log/warn ::parse-value :default {:anomaly :anomalies/incorrect})
   nil)
 
@@ -193,38 +188,40 @@
 ; --------------------------------------------------------- Transform Interface
 
 (defmulti transform :type)
-(defmethod transform :aux [{:keys [type k v]}]
-  {:aux 
+(defmethod transform :aux 
+  [{:keys [type kind k v]}]
+  {:aux
    {(bytes->string (:data k))
     {:type type
-     :encoding (or (:encoding v) :raw)
+     :kind kind
      :value (parse-value :aux v)}}})
 
-(defmethod transform :key-value [{:keys [expiry kind k v]}]
+(defmethod transform :key-value 
+  [{:keys [expiry kind k v]}]
   (log/trace ::transform :key-value {:expiry expiry})
   {:database
-   {(bytes->string (:data k)) 
+   {(bytes->string (:data k))
     {:expiry (calc-expiry expiry)
      :kind kind
-     :encoding (or (:encoding v) :raw)
-     :type (or (:type v) :string)
      :value (parse-value kind v)}}})
 
-(defmethod transform :resizdb-info [info]
-  {:resizdb-info 
-   {:db-hash-table-size (-> info :db-hash-table-size :size)
-    :expiry-hash-table-size (-> info :expiry-hash-table-size :size)}})
+(defmethod transform :resizedb-info 
+  [{:keys[kind :db-hash-table-size :expiry-hash-table-size] :as info}]
+  {:resizdb-info info})
 
-(defmethod transform :selectdb [{:keys [db-number]}]
-  {:id (:size db-number)})
+(defmethod transform :selectdb 
+  [db-info]
+  (let [{:keys [kind size]} db-info]
+    {:selectdb {:kind kind
+                :id size}}))
 
 (defn transform-data
   "Transform the entire vector of maps into the desired map."
   [data]
-   (reduce  (fn [acc curr]
-              (log/trace ::transform-data {:transforming curr})
-              (when (seq curr)
-                (merge-with into acc (transform curr))))
+  (reduce  (fn [acc curr]
+             (log/trace ::transform-data {:transforming curr})
+             (when (seq curr)
+               (merge-with into acc (transform curr))))
            {}
            data))
 
@@ -289,6 +286,7 @@
   
   ;; Example usage
   (do
+    (log/set-level! :trace)
     (require '[clojure.edn :as edn]
              '[clojure.java.io :as io]
              '[java-time.api :as jt]
@@ -297,43 +295,179 @@
     (def input-data (-> "test/db/deserialized.edn"
                         io/resource
                         slurp
-                        edn/read-string)))
+                        edn/read-string))) 
   
-  (def transformed-data
-    (transform-data (second input-data))
-    )
+  (filter #(= (:kind %) :RDB_OPCODE_AUX) (second input-data))
 
-  (transform  {:type :key-value,
-              :expiry {},
-              :kind :RDB_TYPE_STRING,
-              :k {:type :string, :kind 0, :special nil, :size 8, :data [105 110 116 118 97 108 117 101]},
-              :v {:type :string, :kind 0, :special nil, :size 13, :data [50 44 49 52 55 44 52 56 51 44 54 52 55]}}
-)
+  (parse-value 
+   :RDB_TYPE_STRING 
+   {:encoding :any
+    :kind     0
+    :special  nil
+    :size     17
+    :data     [49 48 46 53 51 52 53 49 52 51 57 53 56 54 49 57 48]})
+  
+  (parse-value 
+   :RDB_TYPE_STRING
+   {:encoding :any
+    :kind     0
+    :special  nil
+    :size     13
+    :data     [50 44 49 52 55 44 52 56 51 44 54 52 55]})
+  
+  (parse-value :RDB_TYPE_STRING
+               {:type    :int-string
+                :kind    3
+                :special 1
+                :data    [1000]})
+  
+  (parse-value :RDB_TYPE_STREAM_LISTPACKS_3 
+               {:data             [{:stream-id {:encoding :any
+                                                :kind     0
+                                                :special  nil
+                                                :size     16
+                                                :data     [0 0 1 -109 111 81 -114 116 0 0 0 0 0 0 0 0]}, 
+                                    :listpack  {:encoding            :lzh-string, 
+                                                :kind                1, 
+                                                :size                132, 
+                                                :special             nil,
+                                                :uncompressed-length {:kind 1
+                                                                      :size 137},
+                                                :data                [31 -119 0 0 0 32 0 3 1 0 1 4 1 -123 114 105 100 101 114 6 -123 115 112 101 101 100 6 -120 112 111 115 105 116 8 105 111 110 9 -117 108 111 99 97 64 9 6 95 105 100 12 0 1 2 32 44 18 0 1 -120 67 97 115 116 105 108 108 97 9 -124 51 48 46 50 5 1 32 0 0 7 32 27 19 -15 99 28 3 0 1 -123 78 111 114 101 109 6 -124 50 56 46 56 5 3 -64 26 1 -116 52 32 26 16 -120 80 114 105 99 107 101 116 116 9 -124 50 57 46 55 5 2 64 29 1 1 -1]}}], 
+                :element-count    {:kind 0
+                                   :size 3},
+                :last-stream-id   {:ms  1732739449600N
+                                   :seq 0}, 
+                :first-stream-id  {:ms  1732739436148N
+                                   :seq 0},
+                :max-tombstone-id {:ms  0
+                                   :seq 0}, 
+                :offset           {:kind 0
+                                   :size 3}, 
+                :groups           nil})
+
+  (def transformed-data
+    (transform-data (second input-data)))
+
+  (transform  {:type   :key-value,
+               :expiry {},
+               :kind   :RDB_TYPE_STRING,
+               :k      {:type    :string
+                        :kind    0
+                        :special nil
+                        :size    8
+                        :data    [105 110 116 118 97 108 117 101]},
+               :v      {:type    :string
+                        :kind    0
+                        :special nil
+                        :size    13
+                        :data    [50 44 49 52 55 44 52 56 51 44 54 52 55]}})
 
 ;; Print the transformed data
   (map  transform (input-data))
 
   (def aux-values [{:type :aux,
                     :kind :RDB_OPCODE_AUX,
-                    :k {:type :string, :kind 0, :special nil, :size 9, :data [114 101 100 105 115 45 118 101 114]},
-                    :v {:type :string, :kind 0, :special nil, :size 5, :data [55 46 50 46 54]}}
+                    :k    {:type    :string
+                           :kind    0
+                           :special nil
+                           :size    9
+                           :data    [114 101 100 105 115 45 118 101 114]},
+                    :v    {:type    :string
+                           :kind    0
+                           :special nil
+                           :size    5
+                           :data    [55 46 50 46 54]}}
                    {:type :aux,
                     :kind :RDB_OPCODE_AUX,
-                    :k {:type :string, :kind 0, :special nil, :size 10, :data [114 101 100 105 115 45 98 105 116 115]},
-                    :v {:type :int-string, :kind 3, :special 0, :data [64]}}
+                    :k    {:type    :string
+                           :kind    0
+                           :special nil
+                           :size    10
+                           :data    [114 101 100 105 115 45 98 105 116 115]},
+                    :v    {:type    :int-string
+                           :kind    3
+                           :special 0
+                           :data    [64]}}
                    {:type :aux,
                     :kind :RDB_OPCODE_AUX,
-                    :k {:type :string, :kind 0, :special nil, :size 5, :data [99 116 105 109 101]},
-                    :v {:type :int-string, :kind 3, :special 2, :data [1732739669]}}
+                    :k    {:type    :string
+                           :kind    0
+                           :special nil
+                           :size    5
+                           :data    [99 116 105 109 101]},
+                    :v    {:type    :int-string
+                           :kind    3
+                           :special 2
+                           :data    [1732739669]}}
                    {:type :aux,
                     :kind :RDB_OPCODE_AUX,
-                    :k {:type :string, :kind 0, :special nil, :size 8, :data [117 115 101 100 45 109 101 109]},
-                    :v {:type :int-string, :kind 3, :special 2, :data [1520096]}}
+                    :k    {:type    :string
+                           :kind    0
+                           :special nil
+                           :size    8
+                           :data    [117 115 101 100 45 109 101 109]},
+                    :v    {:type    :int-string
+                           :kind    3
+                           :special 2
+                           :data    [1520096]}}
                    {:type :aux,
                     :kind :RDB_OPCODE_AUX,
-                    :k {:type :string, :kind 0, :special nil, :size 8, :data [97 111 102 45 98 97 115 101]},
-                    :v {:type :int-string, :kind 3, :special 0, :data [0]}}])
+                    :k    {:type    :string
+                           :kind    0
+                           :special nil
+                           :size    8
+                           :data    [97 111 102 45 98 97 115 101]},
+                    :v    {:type    :int-string
+                           :kind    3
+                           :special 0
+                           :data    [0]}}])
 
+  
+  ;; ------------------------------------------------------ Debug transfomation for expiry-db
+  (do
+    (require '[java-time.api :as jt]
+             '[redis.time :as time]
+             '[redis.utils :as utils])
+    (def sample-expiry-db [{:type :aux
+                            :k    [114 101 100 105 115 45 118 101 114]
+                            :v    [55 46 50 46 48]}
+                           {:type :aux
+                            :k    [114 101 100 105 115 45 98 105 116 115]
+                            :v    [64]}
+                           {:type      :selectdb
+                            :db-number {:size 0}}
+                           {:type                   :resizdb-info
+                            :db-hash-table-size     {:size 3}
+                            :expiry-hash-table-size {:size 3}}
+                           {:type   :key-value
+                            :expiry {:expiry 44172959069306880N
+                                     :type   :expiry-ms
+                                     :unit   :milliseconds}
+                            :kind   :RDB_TYPE_STRING
+                            :k      [109 97 110 103 111]
+                            :v      [97 112 112 108 101]}
+                           {:type   :key-value
+                            :expiry {:expiry 3422276229857280N
+                                     :type   :expiry-ms
+                                     :unit   :milliseconds}
+                            :kind   :RDB_TYPE_STRING
+                            :k      [98 108 117 101 98 101 114 114 121]
+                            :v      [112 101 97 114]}
+                           {:type   :key-value
+                            :expiry {:expiry 3422276229857280N
+                                     :type   :expiry-ms
+                                     :unit   :milliseconds}
+                            :kind   :RDB_TYPE_STRING
+                            :k      [112 101 97 114]
+                            :v      [111 114 97 110 103 101]}])
+    (-> sample-expiry-db
+        transform/transform-data
+        (utils/apply-f-to-key :k utils/binary-array->string)
+        ;time/expired?
+        ))
+
+  
   (reduce  (fn [acc curr]
              (merge-with into acc (transform curr)))
            {}
