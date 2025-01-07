@@ -121,7 +121,7 @@
 ;; Depends only on Layer 7
  
 ;; placing here till we have a real parser for this version.
-(defn parse-stream-listpack
+(defn parse-stream-listpacks
   []
   (gloss/compile-frame
    (gloss/ordered-map
@@ -130,7 +130,7 @@
     :stream-id (parse-metadata-stream-id)  ; stream ID (ms + seq)
     :content (string/parse-string-encoded-value))))  ; raw listpack content as string
 
-(defn parse-stream-listpack-2
+(defn parse-stream-listpacks-2
   "Parses RDB_TYPE_STREAM_LISTPACKS_2"
   []
   (gloss/ordered-map
@@ -143,11 +143,11 @@
    :offset (primitives/parse-length-prefix)
    :groups (parse-stream-groups)))
 
-(defn parse-stream-listpack-3
+(defn parse-stream-listpacks-3
   "Despite being tagged as v3 in Redis 7.2.6, the data is actually written in v2 format.
    This parser handles that case until we need to support actual v3 format from newer Redis versions."
   []
-  (parse-stream-listpack-2))
+  (parse-stream-listpacks-2))
 
 
 ;; ---------------------------------------------------------------------------- REPL

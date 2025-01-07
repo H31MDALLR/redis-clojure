@@ -29,5 +29,36 @@
     (throw (ex-info "Unsupported storage type for zset"
                    {:storage-type encoding}))))
 
+(defmethod decode-type :zset-listpack [{:keys [elements]} _]
+  (->> elements
+       flatten
+       (partition 2)
+       (reduce (fn [acc [member score]]
+                 (assoc acc 
+                        (-> member :value)
+                        (-> score :value float)))
+               {})))
+
 (defn zset->value [data]
   data) 
+
+(comment 
+  (def test-data  {:header {:total-bytes 70, :num-elements 6},
+                   :elements
+                   [[{:kind :string/tiny, :value "station:1", :backlen [10]}
+                     {:kind :number/uint64, :value 1367952638197536N, :backlen [9]}
+                     {:kind :string/tiny, :value "station:2", :backlen [10]}
+                     {:kind :number/uint64, :value 1367952641196278N, :backlen [9]}
+                     {:kind :string/tiny, :value "station:3", :backlen [10]}
+                     {:kind :number/uint64, :value 1367953014079341N, :backlen [9]}]]})
+
+  (decode-type test-data :zset-listpack)
+  (->> test-data
+      :elements
+      flatten
+      (partition 2)
+       (reduce (fn [acc [member score]]
+                 (assoc acc (-> member :value) (-> score :value float)))
+               {}))
+  
+  ::leave-this-here)
